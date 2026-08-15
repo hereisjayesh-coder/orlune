@@ -19,5 +19,7 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+# org.jetbrains.kotlin.android is intentionally absent: AGP 9.0+ has Kotlin support
+# built in (https://kotl.in/gradle/agp-built-in-kotlin). kotlin.plugin.compose still
+# applies, and its version pins the Kotlin compiler used for the whole build.
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

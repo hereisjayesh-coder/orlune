@@ -1,0 +1,30 @@
+# Orlune — Roadmap
+
+Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 14. That document is the source of truth for what each phase means; this file just tracks where we actually are. Day-to-day task checkboxes live in `TODO.md`.
+
+| Phase | Focus | Status |
+|---|---|---|
+| 0 | Research & feasibility | ✅ Complete, signed off 2026-08-16 |
+| 1 | Architecture & Android project setup | ✅ Complete — project scaffolded, build environment fixed and verified, `assembleDebug` succeeds |
+| 2 | Local database & domain models | Not started |
+| 3 | Usage monitoring | Not started |
+| 4 | Deterministic rule engine | Not started |
+| 5 | App blocking | Not started |
+| 6 | Scheduling & focus sessions | Not started |
+| 7 | Analytics & algorithms | Not started |
+| 8 | Original UI & themes | Not started |
+| 9 | Privacy Center & data controls | Not started |
+| 10 | Security & performance | Not started |
+| 11 | Testing | Not started |
+| 12 | Google Play compliance | Not started |
+| 13 | Release preparation | Not started |
+
+## Phase 1 exit criteria (met)
+
+- [x] Gradle/Kotlin/Compose project compiles (`.\gradlew.bat assembleDebug` — BUILD SUCCESSFUL, see `TODO.md` for the exact command and toolchain versions)
+- [x] Module/package structure in place (see `ARCHITECTURE.md`)
+- [x] No features implemented — bare Compose screen only
+
+## Explicitly not started (by design, later phases)
+
+App blocking, AccessibilityService, VPN/website blocking, analytics, recommendation/wellbeing-score algorithms, monetization, accounts, cloud sync, AI/ML — none of these exist in the codebase yet. See `docs/phase-0-research.md` Section 13 (MVP scope) for what's in vs. deferred.
