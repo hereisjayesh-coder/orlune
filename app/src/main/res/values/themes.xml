@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Placeholder manifest theme; real Light/Dark/Forest theming is Compose-driven (Phase 8). -->
+    <style name="Theme.Orlune" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

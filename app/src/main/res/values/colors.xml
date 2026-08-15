@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Placeholder launcher icon colors; real branding is Phase 8/13 work. -->
+    <color name="ic_launcher_background">#6650a4</color>
+</resources>
