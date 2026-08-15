@@ -1,0 +1,24 @@
+# Claude Code local settings (machine-specific, not shared)
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android / Gradle / Kotlin (for Phase 1+)
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.idea/**
+/captures
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+build/
+/build/
+*.jks
+*.keystore
