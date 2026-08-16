@@ -8,7 +8,7 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 | 1 | Architecture & Android project setup | ✅ Complete — project scaffolded, build environment fixed and verified, `assembleDebug` succeeds |
 | 2 | Local database & domain models | ✅ Complete — all 16 Section 8 entities implemented as Room schema, verified build |
 | 3 | Usage monitoring | ✅ Complete — pipeline built, unit-tested (15/15 pass), instrumentation-tested on a real device (3/3 pass), end-to-end data flow confirmed on-device |
-| 4 | Deterministic rule engine | Not started |
+| 4 | Deterministic rule engine | ✅ Complete — `LimitEngine`, `ScheduleEngine`, `BlockingEngine`, `GoalEngine` built pure/unit-tested (33/33 pass); `FrictionEngine` deferred (no config field exists, MVP defers the Friction blocking level) |
 | 5 | App blocking | Not started |
 | 6 | Scheduling & focus sessions | Not started |
 | 7 | Analytics & algorithms | Not started |
@@ -37,6 +37,12 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 - [x] Raw -> aggregated pipeline, `App`/`DailyUsage`/`Session` populated
 - [x] Edge cases (midnight rollover, timezone changes, reboot, orphaned events, duplicate processing) — see `TODO.md` for specifics, including two real bugs caught and fixed during this phase
 - [x] Confirmed working against real Room/SQLite on an actual device — `.\gradlew.bat connectedDebugAndroidTest` run on a Pixel 7a, 3/3 pass; manual on-device run confirmed real usage data flows through to the UI
+
+## Phase 4 exit criteria (met)
+
+- [x] `LimitEngine`, `ScheduleEngine`, `BlockingEngine`, `GoalEngine` implemented under `core/domain/rules/`, pure Kotlin, fully unit-tested (33/33 pass) — see `TODO.md` for scoping rationale and per-engine notes
+- [x] No enforcement wiring yet (no repository, no WorkManager worker, no UI) — reading real `Rule`/`Schedule`/`AppListEntry` rows and applying these engines to live data is Phase 5/6's job
+- [x] No schema changes — existing Phase 2 entities already had everything these engines needed
 
 ## Explicitly not started (by design, later phases)
 
