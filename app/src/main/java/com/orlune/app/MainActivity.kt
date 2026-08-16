@@ -49,6 +49,8 @@ import com.orlune.app.platform.blocking.BlockingMonitorService
 import com.orlune.app.platform.blocking.NotificationPermission
 import com.orlune.app.platform.blocking.OverlayPermission
 import com.orlune.app.platform.usage.UsageAccessPermission
+import com.orlune.app.data.local.entity.ThemePreferenceEntity
+import com.orlune.app.ui.OrluneRoot
 import com.orlune.app.ui.theme.OrluneTheme
 import kotlinx.coroutines.launch
 
@@ -65,8 +67,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val app = application as OrluneApplication
         setContent {
-            OrluneTheme {
-                DebugScreen(app)
+            val themePreference by app.database.themePreferenceDao()
+                .observe()
+                .collectAsState(initial = ThemePreferenceEntity(themeId = "system"))
+            OrluneTheme(themeMode = themePreference?.themeId ?: "system") {
+                OrluneRoot(app)
             }
         }
     }

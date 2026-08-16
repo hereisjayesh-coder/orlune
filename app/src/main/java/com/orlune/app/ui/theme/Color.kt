@@ -2,12 +2,15 @@ package com.orlune.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Placeholder Material 3 baseline colors. Real Light/Dark/Forest design-system
-// colors are Phase 8 (Original UI & themes) work, not decided here.
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+val OrluneBlack = Color(0xFF050505)
+val OrluneSurface = Color(0xFF111111)
+val OrluneSurfaceVariant = Color(0xFF1B1B1B)
+val OrluneText = Color(0xFFF2F0EA)
+val OrluneMutedText = Color(0xFFA5A39D)
+val OrluneAccent = Color(0xFFE3C875)
+val OrluneAccentDark = Color(0xFF7B681E)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val OrluneLightBackground = Color(0xFFF8F7F3)
+val OrluneLightSurface = Color(0xFFFFFFFF)
+val OrluneLightText = Color(0xFF1A1916)
+val OrluneLightMutedText = Color(0xFF696761)

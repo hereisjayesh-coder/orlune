@@ -10,10 +10,10 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 | 3 | Usage monitoring | ✅ Complete — pipeline built, unit-tested (15/15 pass), instrumentation-tested on a real device (3/3 pass), end-to-end data flow confirmed on-device |
 | 4 | Deterministic rule engine | ✅ Complete — `LimitEngine`, `ScheduleEngine`, `BlockingEngine`, `GoalEngine` built pure/unit-tested (33/33 pass); `FrictionEngine` deferred (no config field exists, MVP defers the Friction blocking level) |
 | 5 | App blocking | ✅ Complete — Usage-Access-based detection + `SYSTEM_ALERT_WINDOW` overlay, foreground-service enforcement loop, verified on a real device (limit rules, schedule rules, essential-app exemption, permission revocation/regrant, app restart, self-stop all confirmed) |
-| 6 | Scheduling & focus sessions | 🟡 Partially complete — `FocusSessionEngine`/`FocusSessionRepository` built, unit-tested, and wired into `BlockingRepository`; Room v1→v2 migration shipped alongside it (see `docs/PROJECT_STATE.md`). **Landed in commits `96f1d51`/`96b93d4` without this file being updated at the time — reconciled 2026-08-16 audit.** Immediate and one-time-delayed sessions only; recurring focus scheduling not implemented — do not add without reviewing this design with the user first. No dedicated real UI (debug screen only, same as Phases 3/5). |
+| 6 | Scheduling & focus sessions | 🟡 Partially complete — `FocusSessionEngine`/`FocusSessionRepository` built, unit-tested, and wired into `BlockingRepository`; Room v1→v2 migration shipped alongside it. The Compose shell now exposes focus sessions and recurring app schedules; recurring focus sessions remain intentionally out of scope. |
 | 7 | Analytics & algorithms | Not started |
-| 8 | Original UI & themes | Not started |
-| 9 | Privacy Center & data controls | Not started |
+| 8 | Original UI & themes | 🟡 Initial shell complete — black-first Compose navigation, Home/Focus/Limits/Insights/Settings, fixed light/dark/system themes, and branded clock icon; onboarding and visual polish remain |
+| 9 | Privacy Center & data controls | 🟡 Initial controls complete — permission status, local JSON export, and delete-all; dedicated Privacy Center remains |
 | 10 | Security & performance | Not started |
 | 11 | Testing | Not started |
 | 12 | Google Play compliance | Not started |
@@ -65,12 +65,13 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 - [x] Room v1→v2 migration for the new `focus_sessions.blockedPackages` and
       `schedules.name` columns — explicit, non-destructive, tested against real
       reconstructed v1 data for all 16 tables, re-verified on a physical device
-- [ ] No real UI — only reachable via `MainActivity`'s debug screen form
+- [x] Initial Compose UI — Home, Focus, Limits, Insights, Settings, permission status,
+      theme selection, local export, and delete-all controls are wired to existing
+      repositories; dedicated onboarding/Privacy Center remains
 - [ ] Recurring focus-session scheduling — explicitly not built; one-time
       immediate/delayed sessions only
-- [ ] Boundary validation for non-positive `plannedMinutes` at the repository/engine
-      level — currently only enforced by the debug UI's form, not the repository
-      itself (see `docs/PROJECT_STATE.md` known risks)
+- [x] Repository boundary validation for focus duration and package list; malformed
+      schedule rows fail safe as non-triggering during enforcement
 
 ## Explicitly not started (by design, later phases)
 

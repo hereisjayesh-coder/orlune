@@ -19,17 +19,27 @@ class FocusSessionRepository(
 ) {
     fun observeAll(): Flow<List<FocusSessionEntity>> = focusSessionDao.observeAll()
 
-    suspend fun startSession(plannedMinutes: Int, blockedPackages: List<String>, startAt: Long = nowMillis()): Long =
-        focusSessionDao.upsert(
+    suspend fun startSession(plannedMinutes: Int, blockedPackages: List<String>, startAt: Long = nowMillis()): Long {
+        require(plannedMinutes in MIN_PLANNED_MINUTES..MAX_PLANNED_MINUTES) {
+            "plannedMinutes must be between $MIN_PLANNED_MINUTES and $MAX_PLANNED_MINUTES"
+        }
+        val normalizedPackages = blockedPackages
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .distinct()
+        require(normalizedPackages.isNotEmpty()) { "blockedPackages must contain at least one package" }
+
+        return focusSessionDao.upsert(
             FocusSessionEntity(
                 startTs = startAt,
                 endTs = null,
                 plannedMinutes = plannedMinutes,
                 completedMinutes = 0,
                 blockedCategoryIds = "",
-                blockedPackages = blockedPackages.joinToString(",")
+                blockedPackages = normalizedPackages.joinToString(",")
             )
         )
+    }
 
     /** Ends every currently-[FocusSessionState.ACTIVE] session now, short of its planned duration. */
     suspend fun cancelActiveSessions() {
@@ -62,5 +72,10 @@ class FocusSessionRepository(
                 }
             }
         }
+    }
+
+    private companion object {
+        const val MIN_PLANNED_MINUTES = 1
+        const val MAX_PLANNED_MINUTES = 24 * 60
     }
 }

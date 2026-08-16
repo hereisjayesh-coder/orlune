@@ -8,10 +8,11 @@ Orlune is an original product inspired by the general problem space of tools lik
 
 Phases 0–5 are complete and verified (research, project setup, Room database, usage
 monitoring, deterministic rule engine, app blocking), and Phase 6 (focus sessions) is
-partially implemented — see `docs/PROJECT_STATE.md` for the current, dated snapshot
+implemented with a preserving Room migration — see `docs/PROJECT_STATE.md` for the current, dated snapshot
 (build/test status, known bugs, next task) and `ROADMAP.md` for phase-by-phase detail.
-`TODO.md` has full task-level history. Only a functional debug screen exists for UI so
-far — the real onboarding/home/settings UI is Phase 8.
+`TODO.md` has full task-level history. The current Compose shell provides Home, Focus,
+Limits, Insights, and Settings flows; remaining onboarding and release hardening are
+tracked in `docs/PROJECT_STATE.md` and `ROADMAP.md`.
 
 Agents picking up this repo: start with `AGENTS.MD`, then `docs/PROJECT_STATE.md`.
 
@@ -23,7 +24,7 @@ Agents picking up this repo: start with `AGENTS.MD`, then `docs/PROJECT_STATE.md
    ```
    .\gradlew.bat assembleDebug
    ```
-4. No emulator is configured (8 GB RAM machine) — use a physical device with USB debugging enabled. `adb devices` should list it once connected; run on it from Android Studio or `.\gradlew.bat installDebug`. You should see a bare screen with the text "Orlune" — that's the full scope of Phase 1.
+4. No emulator is configured (8 GB RAM machine) — use a physical device with USB debugging enabled. `adb devices` should list it once connected; run on it from Android Studio or `.\gradlew.bat installDebug`.
 
 ## Core Principles
 

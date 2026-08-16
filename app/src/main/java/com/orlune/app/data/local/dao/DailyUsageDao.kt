@@ -15,6 +15,13 @@ data class AppDailyUsage(
     val sessionCount: Int
 )
 
+data class AppPeriodUsage(
+    val packageName: String,
+    val label: String?,
+    val totalUsageSeconds: Long,
+    val sessionCount: Int
+)
+
 @Dao
 interface DailyUsageDao {
     @Upsert
@@ -48,4 +55,21 @@ interface DailyUsageDao {
         """
     )
     fun observeForDayWithLabels(epochDay: Long): Flow<List<AppDailyUsage>>
+
+    @Query("SELECT COALESCE(SUM(totalUsageSeconds), 0) FROM daily_usage WHERE epochDay BETWEEN :startEpochDay AND :endEpochDay")
+    fun observeTotalSecondsBetween(startEpochDay: Long, endEpochDay: Long): Flow<Long>
+
+    @Query(
+        """
+        SELECT daily_usage.packageName AS packageName, apps.label AS label,
+               SUM(daily_usage.totalUsageSeconds) AS totalUsageSeconds,
+               SUM(daily_usage.sessionCount) AS sessionCount
+        FROM daily_usage
+        LEFT JOIN apps ON apps.packageName = daily_usage.packageName
+        WHERE daily_usage.epochDay BETWEEN :startEpochDay AND :endEpochDay
+        GROUP BY daily_usage.packageName, apps.label
+        ORDER BY totalUsageSeconds DESC
+        """
+    )
+    fun observeAppTotalsBetween(startEpochDay: Long, endEpochDay: Long): Flow<List<AppPeriodUsage>>
 }

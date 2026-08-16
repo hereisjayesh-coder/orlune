@@ -3,7 +3,7 @@ package com.orlune.app.data.local.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-/** Single-row settings table (always `id = SINGLETON_ID`). [themeId] is "light"/"dark"/"forest". */
+/** Single-row settings table (always `id = SINGLETON_ID`). [themeId] is "system"/"light"/"dark". */
 @Entity(tableName = "theme_preferences")
 data class ThemePreferenceEntity(
     @PrimaryKey val id: Int = SINGLETON_ID,

@@ -136,7 +136,10 @@ class BlockingRepository(
         val schedules = scheduleDao.observeForRule(rule.id).first()
         if (schedules.isEmpty()) return false
         val now = LocalDateTime.ofInstant(Instant.ofEpochMilli(nowMillis()), zoneId)
-        return schedules.any { ScheduleEngine.isActive(ScheduleEngine.parse(it), now) }
+        return schedules.any { schedule ->
+            runCatching { ScheduleEngine.isActive(ScheduleEngine.parse(schedule), now) }
+                .getOrDefault(false)
+        }
     }
 
     companion object {

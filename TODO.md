@@ -1,5 +1,16 @@
 # Orlune — TODO
 
+## Current takeover checkpoint — 2026-08-16
+- [x] Replaced the launch surface with a black-first Compose shell: Home, Focus,
+      Limits, Insights, and Settings, backed by the existing repositories.
+- [x] Added local JSON export through a user-initiated Android share action and a
+      delete-all-local-data control; no network or backup path was added.
+- [x] Added repository boundary validation for focus duration/package inputs and
+      fail-safe handling for malformed persisted schedules.
+- [x] Updated the launcher asset and reconciled project-state documentation.
+- [ ] Repeat full UI, permission, blocking, export, and delete flows on the physical
+      Pixel 7a after reconnecting it.
+
 ## Phase 0 — Research & Feasibility
 - [x] Competitor research (Opal, Digital Wellbeing, ScreenZen, one sec, Freedom, StayFree)
 - [x] Android platform capability research → `docs/android-platform-capabilities.md`

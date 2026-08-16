@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.fail
 import org.junit.Test
 
 class FocusSessionRepositoryTest {
@@ -124,5 +125,27 @@ class FocusSessionRepositoryTest {
         assertEquals(0, stored.completedMinutes)
         assertNull(stored.endTs)
         assertEquals(FocusSessionState.SCHEDULED, FocusSessionEngine.stateOf(stored, now))
+    }
+
+    @Test
+    fun `startSession rejects empty package lists`() = runTest {
+        val repository = FocusSessionRepository(FakeFocusSessionDao(), nowMillis = { 0L })
+
+        try {
+            repository.startSession(plannedMinutes = 25, blockedPackages = listOf(" ", ""))
+            fail("Expected empty package list to be rejected")
+        } catch (_: IllegalArgumentException) {
+        }
+    }
+
+    @Test
+    fun `startSession rejects durations outside the supported range`() = runTest {
+        val repository = FocusSessionRepository(FakeFocusSessionDao(), nowMillis = { 0L })
+
+        try {
+            repository.startSession(plannedMinutes = 0, blockedPackages = listOf("app.a"))
+            fail("Expected non-positive duration to be rejected")
+        } catch (_: IllegalArgumentException) {
+        }
     }
 }

@@ -17,7 +17,7 @@ com.orlune.app/
 ├── core/
 │   ├── domain/          Business models, use-cases — `usage/` (Phase 3), `rules/` (Phase 4)
 │   ├── database/        Cross-cutting DB utilities (migrations, converters) — empty; none needed yet at schema version 1
-│   ├── privacy/         Privacy Center logic — permission status, export/delete (Phase 9)
+│   ├── privacy/         Local JSON export/delete support
 │   └── security/        Threat-model-driven safeguards (Phase 10)
 ├── feature/
 │   ├── onboarding/       Welcome, privacy promise, Usage Access setup (MVP)
@@ -25,12 +25,14 @@ com.orlune.app/
 │   ├── settings/         App settings
 │   └── privacy/          Privacy Center UI (Phase 9)
 └── ui/
-    ├── theme/            Compose theme (exists — placeholder Material 3 baseline, real Light/Dark/Forest theming is Phase 8)
+    ├── theme/            Compose black-first Light/Dark/System theme
     ├── components/        Shared Compose components
     └── navigation/        Navigation graph
 ```
 
-All of the above except `ui/theme` and the root `MainActivity.kt` are currently **empty packages** (a `.gitkeep` only) — this is Phase 1 structure, not Phase 1 features. Each fills in during the phase that owns it, per `docs/phase-0-research.md` Section 14.
+The current Compose shell is in `ui/OrluneRoot.kt`; local export support is in
+`data/privacy/LocalDataExporter.kt`. The older debug composables remain in
+`MainActivity.kt` as regression/reference code but are no longer the launch surface.
 
 Testing uses Android's standard source sets — `app/src/test` (JVM unit tests) and `app/src/androidTest` (instrumented tests) — rather than a top-level `tests/` folder, since that's what Gradle's Android plugin actually wires up test tasks against.
 

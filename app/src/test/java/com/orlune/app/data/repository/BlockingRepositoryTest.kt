@@ -2,6 +2,7 @@ package com.orlune.app.data.repository
 
 import com.orlune.app.core.domain.rules.BlockDecision
 import com.orlune.app.data.local.dao.AppDailyUsage
+import com.orlune.app.data.local.dao.AppPeriodUsage
 import com.orlune.app.data.local.dao.AppListEntryDao
 import com.orlune.app.data.local.dao.DailyUsageDao
 import com.orlune.app.data.local.dao.FocusSessionDao
@@ -66,6 +67,8 @@ class BlockingRepositoryTest {
             )
         }
         override fun observeForDayWithLabels(epochDay: Long): Flow<List<AppDailyUsage>> = flowOf(emptyList())
+        override fun observeTotalSecondsBetween(startEpochDay: Long, endEpochDay: Long): Flow<Long> = flowOf(0L)
+        override fun observeAppTotalsBetween(startEpochDay: Long, endEpochDay: Long): Flow<List<AppPeriodUsage>> = flowOf(emptyList())
     }
 
     private class FakeSessionDao(private val openSessions: List<SessionEntity>) : SessionDao {

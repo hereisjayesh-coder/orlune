@@ -109,8 +109,8 @@ audit (see that file's date), status is approximately:
 | 3 | Usage monitoring | Complete, unit + real-device instrumentation verified |
 | 4 | Deterministic rule engine | Complete, unit-tested |
 | 5 | App blocking | Complete, real-device verified |
-| 6 | Focus sessions & Room v1→v2 migration | **Implemented but never phase-documented** — see below |
-| 7+ | Analytics/algorithms, real UI, Privacy Center, security/perf, testing, Play compliance, release | Not started |
+| 6 | Focus sessions & Room v1→v2 migration | Implemented; recurring focus scheduling intentionally deferred |
+| 7+ | Analytics/algorithms, onboarding, full Privacy Center, security/perf, testing, Play compliance, release | Partially started; see `docs/PROJECT_STATE.md` |
 
 **Important history note:** commits `96f1d51` and `96b93d4` added a working Phase 6
 (`FocusSessionEngine`/`FocusSessionRepository`, `blockedPackages` wired into
@@ -251,14 +251,12 @@ disabling permissions or uninstalling the app. Never describe blocking as
 
 ## Known risks (as of the last audit — see `docs/PROJECT_STATE.md` for date)
 
-- No dedicated real UI yet — `MainActivity`'s `DebugScreen` is the only way to
-  exercise Phase 3/5/6 functionality, and it will need a genuine rebuild in Phase 8.
-- `FocusSessionRepository.startSession`/`FocusSessionEngine` do not validate
-  `plannedMinutes > 0` at the repository/engine boundary — currently only reachable
-  through `MainActivity`'s form, which does validate, but any future caller
-  (real UI, tests, import/export) that skips that check could persist a
-  negative-`completedMinutes` session. Low severity today; worth a boundary guard
-  before Phase 8's real UI lands.
+- The initial real Compose shell is now the launch surface; the older `DebugScreen`
+  remains in `MainActivity.kt` only as regression/reference code. Dedicated onboarding
+  and Privacy Center screens still remain.
+- `FocusSessionRepository.startSession` validates duration and package inputs. The
+  engine still assumes persisted rows are structurally valid, so malformed imported
+  data should continue to be treated conservatively.
 - Overlapping/concurrent focus sessions are not explicitly prevented — the engine
   correctly unions blocked packages across simultaneously-active sessions, but no
   UI/repository guard stops a user (or a caller) from starting two at once. Decide

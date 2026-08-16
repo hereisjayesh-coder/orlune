@@ -3,8 +3,7 @@
 **Last verification date:** 2026-08-16 (full engineering audit — repository, build,
 tests, security/privacy, docs reconciliation)
 
-**Latest verified commit:** `69cab3c` — "docs: add agent-handoff files" (`main`, 4
-commits ahead of `origin/main`, not pushed — push is the user's call, not automatic)
+**Latest verified commit:** `ce637d4` — "feat: add initial Orlune product shell" (`main`; local branch remains ahead of `origin/main` until push).
 
 This file is the living status snapshot. `AGENTS.MD` is the stable rules/conventions
 file — read that first for *how* to work on this repo, this file for *where things
@@ -15,9 +14,9 @@ significant change; keep `AGENTS.MD` stable unless a rule itself changes.
 
 ## Current phase
 
-**Phase 6 (Focus Sessions) and a Room v1→v2 migration are implemented and tested**,
-but were committed without any `TODO.md`/`ROADMAP.md` update — this audit reconciled
-those docs to match. Phase 7 (analytics/algorithms) and beyond have not started.
+**Phase 6 (Focus Sessions) and a Room v1→v2 migration are implemented and tested.**
+The initial Compose product shell and local export/delete controls are now present.
+Analytics/recommendation algorithms remain deferred.
 
 ## Build status — VERIFIED
 
@@ -25,7 +24,7 @@ Ran on 2026-08-16 in this environment (`JAVA_HOME=F:\Android Stu\jbr`,
 `GRADLE_USER_HOME=F:\GradleUserHome`):
 
 - `.\gradlew.bat assembleDebug --stacktrace` → **BUILD SUCCESSFUL**
-- `.\gradlew.bat testDebugUnitTest --stacktrace` → **BUILD SUCCESSFUL**, 90/90 tests
+- `.\gradlew.bat testDebugUnitTest assembleDebug assembleDebugAndroidTest --stacktrace` → **BUILD SUCCESSFUL**, 92/92 unit tests
   pass, 0 failures, 0 errors (first invocation that session hit a transient Gradle
   test-event-reporter filesystem error unrelated to test content — see `AGENTS.MD`
   test-commands section — retry succeeded cleanly)
@@ -46,7 +45,7 @@ Ran on 2026-08-16 in this environment (`JAVA_HOME=F:\Android Stu\jbr`,
 | Unit | `UsageAggregatorTest` | 4 | pass |
 | Unit | `BlockingRepositoryTest` | 22 | pass |
 | Unit | `FocusSessionRepositoryTest` | 6 | pass |
-| **Unit total** | | **90** | **90/90 pass** |
+| **Unit total** | | **92** | **92/92 pass** |
 | Instrumentation | `OrluneDatabaseMigrationTest` | 1 | pass (real device) |
 | Instrumentation | `BlockingRepositoryInstrumentedTest` | 8 | pass (real device) |
 | Instrumentation | `UsageRepositoryInstrumentedTest` | 3 | pass (real device) |
@@ -90,12 +89,11 @@ end-to-end interactively; only the automated instrumentation suite was re-run.
 
 ## Unfinished / not started
 
-Real onboarding + home + settings + Privacy Center UI (Phase 8/9 — only a functional
-debug screen exists today), analytics/recommendation algorithms (Phase 7), security &
-performance hardening pass (Phase 10 — package exists, empty), broader test coverage
-beyond what's listed above (Phase 11), Google Play compliance work (Phase 12),
-release preparation (Phase 13). Website/VPN blocking and AccessibilityService-based
-detection remain deliberately deferred.
+Onboarding is not yet a dedicated first-run flow. The product shell now includes Home,
+Focus, Limits, Insights, Settings, permission status, local JSON export, and delete-all
+controls; a fuller Privacy Center and broader test/release hardening remain. Analytics/
+recommendation algorithms, AccessibilityService, and website/VPN blocking remain
+deliberately deferred.
 
 ## Bugs found and fixed this audit
 
@@ -131,25 +129,21 @@ was commissioned to find.
 ## Known risks (not yet fixed — deliberately left for a future task)
 
 See `AGENTS.MD`'s "Known risks" section — kept there since it's read alongside the
-rules that explain why each one matters. Summary: no boundary validation on
-`FocusSessionEngine`/`FocusSessionRepository` for non-positive `plannedMinutes`
-(low severity, not currently reachable); overlapping/concurrent focus sessions
-aren't explicitly prevented (a product decision, not obviously a bug); minor
+rules that explain why each one matters. Summary: overlapping/concurrent focus
+sessions aren't explicitly prevented (a product decision, not obviously a bug);
+recurring focus scheduling remains intentionally out of scope; manual UI/device
+exercise must be repeated after the shell replacement; minor
 `docs/dependency-audit.md` test-dependency table gap.
 
 ## Next recommended task
 
 Pick one, don't start both without checking in:
 
-1. **Small, safe hardening**: add the `plannedMinutes > 0` boundary guard to
-   `FocusSessionRepository.startSession` (mirrors the existing `LimitEngine`/
-   `GoalEngine` non-positive-input guard style) before Phase 8's real UI removes the
-   only validation currently in place (`MainActivity`'s form).
-2. **Phase 7 or Phase 8 planning**: decide with the user which comes next —
-   analytics/algorithms (Phase 7, needs real usage history to be meaningful) vs. the
-   real UI (Phase 8, blocks on nothing and would let Phase 3/5/6 be exercised by an
-   actual user instead of the debug screen). `ROADMAP.md`/`docs/phase-0-research.md`
-   Section 14 has the original phase ordering rationale if useful context.
+1. Repeat the Compose shell flow and export/delete flow on the physical Pixel 7a,
+   then perform a release-hardening review.
+2. Decide with the user whether to add a dedicated onboarding/Privacy Center flow or
+   move to deferred analytics/recommendation work. Do not add recurring focus
+   scheduling without a separate product decision.
 
 Do not start either without user sign-off — this audit's mandate was to stabilize
 and document, not to open new feature work.
