@@ -15,7 +15,7 @@ class ScheduleEngineTest {
     @Test
     fun `parse splits comma-separated days and HH mm times`() {
         val window = ScheduleEngine.parse(
-            ScheduleEntity(daysOfWeek = "MON,WED,FRI", startTime = "09:00", endTime = "17:30", associatedRuleId = 1)
+            ScheduleEntity(name = "Work hours", daysOfWeek = "MON,WED,FRI", startTime = "09:00", endTime = "17:30", associatedRuleId = 1)
         )
 
         assertEquals(setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY), window.daysOfWeek)
@@ -26,7 +26,7 @@ class ScheduleEngineTest {
     @Test
     fun `parse handles a single day`() {
         val window = ScheduleEngine.parse(
-            ScheduleEntity(daysOfWeek = "SUN", startTime = "00:00", endTime = "23:59", associatedRuleId = 1)
+            ScheduleEntity(name = "Sunday test", daysOfWeek = "SUN", startTime = "00:00", endTime = "23:59", associatedRuleId = 1)
         )
 
         assertEquals(setOf(DayOfWeek.SUNDAY), window.daysOfWeek)

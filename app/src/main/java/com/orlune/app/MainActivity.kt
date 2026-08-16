@@ -38,8 +38,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.orlune.app.core.domain.focus.FocusSessionEngine
+import com.orlune.app.core.domain.focus.FocusSessionState
 import com.orlune.app.data.local.dao.AppDailyUsage
 import com.orlune.app.data.local.entity.AppListEntryEntity
+import com.orlune.app.data.local.entity.FocusSessionEntity
 import com.orlune.app.data.local.entity.RuleEntity
 import com.orlune.app.data.local.entity.ScheduleEntity
 import com.orlune.app.platform.blocking.BlockingMonitorService
@@ -50,10 +53,11 @@ import com.orlune.app.ui.theme.OrluneTheme
 import kotlinx.coroutines.launch
 
 /**
- * Temporary debug screen for Phase 3 (Usage Monitoring) and Phase 5 (App Blocking) —
- * functional, not polished. Verifies the permission flows and both pipelines end to
- * end, including a minimal rule-creation form since no real rule-builder UI exists
- * until Phase 6/8. The real onboarding/home UI is Phase 8+.
+ * Temporary debug screen for Phase 3 (Usage Monitoring), Phase 5 (App Blocking), and
+ * Phase 6 (Focus Sessions & Scheduling) — functional, not polished. Verifies the
+ * permission flows and all three pipelines end to end, including minimal rule/
+ * schedule/focus-session creation forms since no real UI exists until Phase 8 (the
+ * approved design prototype). The real onboarding/home UI is Phase 8+.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -100,6 +104,7 @@ private fun DebugScreen(app: OrluneApplication) {
     val rules by app.database.ruleDao().observeAll().collectAsState(initial = emptyList())
     val allowEntries by app.database.appListEntryDao().observeByType("allow").collectAsState(initial = emptyList())
     val todayUsage by app.usageRepository.observeTodayUsage().collectAsState(initial = emptyList())
+    val focusSessions by app.focusSessionRepository.observeAll().collectAsState(initial = emptyList())
 
     Scaffold { innerPadding ->
         LazyColumn(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
@@ -194,7 +199,7 @@ private fun DebugScreen(app: OrluneApplication) {
 
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
-                    AddScheduleRuleForm { packageName, days, start, end ->
+                    AddScheduleRuleForm { name, packageName, days, start, end ->
                         scope.launch {
                             val ruleId = app.database.ruleDao().upsert(
                                 RuleEntity(
@@ -205,7 +210,13 @@ private fun DebugScreen(app: OrluneApplication) {
                                 )
                             )
                             app.database.scheduleDao().upsert(
-                                ScheduleEntity(daysOfWeek = days, startTime = start, endTime = end, associatedRuleId = ruleId)
+                                ScheduleEntity(
+                                    name = name,
+                                    daysOfWeek = days,
+                                    startTime = start,
+                                    endTime = end,
+                                    associatedRuleId = ruleId
+                                )
                             )
                         }
                     }
@@ -238,6 +249,46 @@ private fun DebugScreen(app: OrluneApplication) {
                         Button(onClick = { scope.launch { app.database.appListEntryDao().delete(entry) } }) { Text("Remove") }
                     }
                 }
+
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(text = "Focus sessions (Phase 6)", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                item {
+                    StartFocusSessionForm(
+                        onStartNow = { packages, minutes ->
+                            scope.launch {
+                                app.focusSessionRepository.startSession(plannedMinutes = minutes, blockedPackages = packages)
+                                BlockingMonitorService.start(context)
+                            }
+                        },
+                        onStartLater = { packages, minutes, delayMinutes ->
+                            scope.launch {
+                                val startAt = System.currentTimeMillis() + delayMinutes * 60_000L
+                                app.focusSessionRepository.startSession(
+                                    plannedMinutes = minutes,
+                                    blockedPackages = packages,
+                                    startAt = startAt
+                                )
+                                BlockingMonitorService.start(context)
+                            }
+                        }
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { scope.launch { app.focusSessionRepository.cancelActiveSessions() } }) {
+                        Text("Stop active session")
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(text = "Sessions (${focusSessions.size})", style = MaterialTheme.typography.bodyLarge)
+                }
+                items(focusSessions) { session -> FocusSessionRow(session) }
             }
         }
     }
@@ -278,7 +329,8 @@ private fun AddLimitRuleForm(onAdd: (packageName: String, minutes: Long) -> Unit
 }
 
 @Composable
-private fun AddScheduleRuleForm(onAdd: (packageName: String, daysCsv: String, startTime: String, endTime: String) -> Unit) {
+private fun AddScheduleRuleForm(onAdd: (name: String, packageName: String, daysCsv: String, startTime: String, endTime: String) -> Unit) {
+    var name by remember { mutableStateOf("") }
     var packageName by remember { mutableStateOf("") }
     var days by remember { mutableStateOf("MON,TUE,WED,THU,FRI,SAT,SUN") }
     var startTime by remember { mutableStateOf("00:00") }
@@ -286,14 +338,16 @@ private fun AddScheduleRuleForm(onAdd: (packageName: String, daysCsv: String, st
 
     Column {
         Text("Add schedule rule (default: blocks all day, every day — narrow the window to test)")
+        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Schedule name") })
         OutlinedTextField(value = packageName, onValueChange = { packageName = it }, label = { Text("Package name") })
         OutlinedTextField(value = days, onValueChange = { days = it }, label = { Text("Days (e.g. MON,TUE)") })
         OutlinedTextField(value = startTime, onValueChange = { startTime = it }, label = { Text("Start (HH:mm)") })
         OutlinedTextField(value = endTime, onValueChange = { endTime = it }, label = { Text("End (HH:mm)") })
         Button(
             onClick = {
-                if (packageName.isNotBlank() && days.isNotBlank()) {
-                    onAdd(packageName.trim(), days.trim(), startTime.trim(), endTime.trim())
+                if (name.isNotBlank() && packageName.isNotBlank() && days.isNotBlank()) {
+                    onAdd(name.trim(), packageName.trim(), days.trim(), startTime.trim(), endTime.trim())
+                    name = ""
                     packageName = ""
                 }
             }
@@ -320,6 +374,73 @@ private fun AddAllowListForm(onAdd: (packageName: String) -> Unit) {
         ) {
             Text("Add to allow list")
         }
+    }
+}
+
+@Composable
+private fun StartFocusSessionForm(
+    onStartNow: (blockedPackages: List<String>, minutes: Int) -> Unit,
+    onStartLater: (blockedPackages: List<String>, minutes: Int, delayMinutes: Int) -> Unit
+) {
+    var packagesText by remember { mutableStateOf("") }
+    var minutesText by remember { mutableStateOf("") }
+    var delayMinutesText by remember { mutableStateOf("") }
+
+    fun parsedPackages() = packagesText.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+
+    Column {
+        Text("Start a focus session (blocks the listed packages while active)")
+        OutlinedTextField(
+            value = packagesText,
+            onValueChange = { packagesText = it },
+            label = { Text("Blocked packages (comma-separated)") }
+        )
+        OutlinedTextField(value = minutesText, onValueChange = { minutesText = it }, label = { Text("Duration (minutes)") })
+        Button(
+            onClick = {
+                val minutes = minutesText.toIntOrNull()
+                val packages = parsedPackages()
+                if (packages.isNotEmpty() && minutes != null && minutes > 0) {
+                    onStartNow(packages, minutes)
+                    packagesText = ""
+                    minutesText = ""
+                }
+            }
+        ) {
+            Text("Start now")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = delayMinutesText,
+            onValueChange = { delayMinutesText = it },
+            label = { Text("Or start in N minutes (one-time scheduled session)") }
+        )
+        Button(
+            onClick = {
+                val minutes = minutesText.toIntOrNull()
+                val delayMinutes = delayMinutesText.toIntOrNull()
+                val packages = parsedPackages()
+                if (packages.isNotEmpty() && minutes != null && minutes > 0 && delayMinutes != null && delayMinutes > 0) {
+                    onStartLater(packages, minutes, delayMinutes)
+                    packagesText = ""
+                    minutesText = ""
+                    delayMinutesText = ""
+                }
+            }
+        ) {
+            Text("Schedule one-time session")
+        }
+    }
+}
+
+@Composable
+private fun FocusSessionRow(session: FocusSessionEntity) {
+    val state = FocusSessionEngine.stateOf(session, System.currentTimeMillis())
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(
+            "$state: ${FocusSessionEngine.blockedPackages(session).joinToString(", ")} " +
+                "(${session.completedMinutes}/${session.plannedMinutes}m)"
+        )
     }
 }
 

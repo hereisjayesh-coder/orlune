@@ -14,6 +14,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.orlune.app.OrluneApplication
 import com.orlune.app.R
+import com.orlune.app.core.domain.focus.FocusSessionEngine
+import com.orlune.app.core.domain.focus.FocusSessionState
 import com.orlune.app.core.domain.rules.BlockDecision
 import com.orlune.app.platform.usage.UsageAccessPermission
 import kotlinx.coroutines.CoroutineScope
@@ -29,9 +31,9 @@ import kotlinx.coroutines.withContext
  * Foreground-service polling loop — the platform's own documented mechanism for
  * enforcement without AccessibilityService (`docs/android-platform-capabilities.md`).
  * Only ever runs while needed: started explicitly (debug UI) or automatically at app
- * cold start when a rule already exists (see [OrluneApplication]), and self-stops the
- * moment there's nothing left to enforce or a required permission is gone — never an
- * unconditional forever-loop.
+ * cold start when a rule or focus session already exists (see [OrluneApplication]),
+ * and self-stops the moment there's nothing left to enforce (see [hasWorkToEnforce])
+ * or a required permission is gone — never an unconditional forever-loop.
  */
 class BlockingMonitorService : Service() {
 
@@ -96,12 +98,13 @@ class BlockingMonitorService : Service() {
                 stopSelf()
                 return
             }
-            if (app.database.ruleDao().observeAll().first().isEmpty()) {
+            if (!hasWorkToEnforce(app)) {
                 stopSelf()
                 return
             }
 
             app.usageRepository.processNewEvents()
+            app.focusSessionRepository.reconcileActiveSessions()
             val outcome = app.blockingRepository.evaluate()
             Log.d(TAG, "tick: foreground=${outcome.packageName} decision=${outcome.decision}")
 
@@ -117,6 +120,21 @@ class BlockingMonitorService : Service() {
         } catch (e: Exception) {
             // Fail safe: skip this tick rather than crash the service or leave a stuck overlay.
             Log.w(TAG, "tick failed, skipping", e)
+        }
+    }
+
+    /**
+     * Whether there's any reason to keep polling: a `Rule` row, or a focus session
+     * that's either currently active or still scheduled for later (a `SCHEDULED`
+     * session must keep the service alive so it can actually reach `ACTIVE` once its
+     * start time arrives — self-stopping early would strand it forever).
+     */
+    private suspend fun hasWorkToEnforce(app: OrluneApplication): Boolean {
+        if (app.database.ruleDao().observeAll().first().isNotEmpty()) return true
+        val now = System.currentTimeMillis()
+        return app.database.focusSessionDao().observeAll().first().any {
+            val state = FocusSessionEngine.stateOf(it, now)
+            state == FocusSessionState.ACTIVE || state == FocusSessionState.SCHEDULED
         }
     }
 

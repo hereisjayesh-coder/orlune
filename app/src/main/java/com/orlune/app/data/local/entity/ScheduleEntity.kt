@@ -8,6 +8,8 @@ import androidx.room.PrimaryKey
 /**
  * A recurring time window associated with a rule. [daysOfWeek] is a comma-separated
  * list (e.g. "MON,TUE,WED"); [startTime]/[endTime] are "HH:mm" device-local times.
+ * [name] (Phase 6) lets a user distinguish multiple schedules — display-only, plays
+ * no role in evaluation ([com.orlune.app.core.domain.rules.ScheduleEngine] is unchanged).
  */
 @Entity(
     tableName = "schedules",
@@ -23,6 +25,7 @@ import androidx.room.PrimaryKey
 )
 data class ScheduleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
     val daysOfWeek: String,
     val startTime: String,
     val endTime: String,

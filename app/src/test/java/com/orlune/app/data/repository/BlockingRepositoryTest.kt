@@ -4,11 +4,13 @@ import com.orlune.app.core.domain.rules.BlockDecision
 import com.orlune.app.data.local.dao.AppDailyUsage
 import com.orlune.app.data.local.dao.AppListEntryDao
 import com.orlune.app.data.local.dao.DailyUsageDao
+import com.orlune.app.data.local.dao.FocusSessionDao
 import com.orlune.app.data.local.dao.RuleDao
 import com.orlune.app.data.local.dao.ScheduleDao
 import com.orlune.app.data.local.dao.SessionDao
 import com.orlune.app.data.local.entity.AppListEntryEntity
 import com.orlune.app.data.local.entity.DailyUsageEntity
+import com.orlune.app.data.local.entity.FocusSessionEntity
 import com.orlune.app.data.local.entity.RuleEntity
 import com.orlune.app.data.local.entity.ScheduleEntity
 import com.orlune.app.data.local.entity.SessionEntity
@@ -18,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset
 
 class BlockingRepositoryTest {
@@ -75,6 +78,27 @@ class BlockingRepositoryTest {
             emptyList()
     }
 
+    private class FakeFocusSessionDao(private val sessions: List<FocusSessionEntity>) : FocusSessionDao {
+        override suspend fun upsert(session: FocusSessionEntity): Long = 0
+        override suspend fun delete(session: FocusSessionEntity) {}
+        override fun observeAll(): Flow<List<FocusSessionEntity>> = flowOf(sessions)
+    }
+
+    private fun focusSession(
+        blockedPackages: List<String>,
+        startTs: Long,
+        plannedMinutes: Int = 25,
+        endTs: Long? = null,
+        completedMinutes: Int = 0
+    ) = FocusSessionEntity(
+        startTs = startTs,
+        endTs = endTs,
+        plannedMinutes = plannedMinutes,
+        completedMinutes = completedMinutes,
+        blockedCategoryIds = "",
+        blockedPackages = blockedPackages.joinToString(",")
+    )
+
     /** Defaults the open session's start to "now" — negligible elapsed-time contribution, so existing
      *  aggregated-usage-only tests aren't affected unless a test overrides [openSessionStartTs]. */
     private fun repository(
@@ -83,7 +107,10 @@ class BlockingRepositoryTest {
         rules: List<RuleEntity> = emptyList(),
         schedulesByRule: Map<Long, List<ScheduleEntity>> = emptyMap(),
         listEntries: List<AppListEntryEntity> = emptyList(),
-        usageByPackage: Map<String, Long> = emptyMap()
+        usageByPackage: Map<String, Long> = emptyMap(),
+        focusSessions: List<FocusSessionEntity> = emptyList(),
+        zoneId: ZoneId = zone,
+        now: Long = fixedNow
     ) = BlockingRepository(
         ruleDao = FakeRuleDao(rules),
         scheduleDao = FakeScheduleDao(schedulesByRule),
@@ -93,9 +120,10 @@ class BlockingRepositoryTest {
             if (foregroundPackage == null) emptyList()
             else listOf(SessionEntity(packageName = foregroundPackage, startTs = openSessionStartTs, endTs = null))
         ),
+        focusSessionDao = FakeFocusSessionDao(focusSessions),
         ownPackageName = "com.orlune.app",
-        zoneId = zone,
-        nowMillis = { fixedNow }
+        zoneId = zoneId,
+        nowMillis = { now }
     )
 
     @Test
@@ -154,7 +182,7 @@ class BlockingRepositoryTest {
     @Test
     fun `active schedule rule blocks`() = runTest {
         val rule = RuleEntity(id = 1, type = "schedule", targetPackageOrCategory = "app.a", threshold = null, windowDefinition = null)
-        val schedule = ScheduleEntity(daysOfWeek = "MON", startTime = "09:00", endTime = "17:00", associatedRuleId = 1)
+        val schedule = ScheduleEntity(name = "Work hours", daysOfWeek = "MON", startTime = "09:00", endTime = "17:00", associatedRuleId = 1)
         val outcome = repository(rules = listOf(rule), schedulesByRule = mapOf(1L to listOf(schedule))).evaluate()
         assertEquals(BlockDecision.BLOCK, outcome.decision)
     }
@@ -162,7 +190,7 @@ class BlockingRepositoryTest {
     @Test
     fun `inactive schedule rule allows`() = runTest {
         val rule = RuleEntity(id = 1, type = "schedule", targetPackageOrCategory = "app.a", threshold = null, windowDefinition = null)
-        val schedule = ScheduleEntity(daysOfWeek = "MON", startTime = "22:00", endTime = "23:00", associatedRuleId = 1)
+        val schedule = ScheduleEntity(name = "Evening", daysOfWeek = "MON", startTime = "22:00", endTime = "23:00", associatedRuleId = 1)
         val outcome = repository(rules = listOf(rule), schedulesByRule = mapOf(1L to listOf(schedule))).evaluate()
         assertEquals(BlockDecision.ALLOW, outcome.decision)
     }
@@ -209,5 +237,89 @@ class BlockingRepositoryTest {
         val rule = RuleEntity(id = 1, type = "limit", targetPackageOrCategory = "app.other", threshold = 1, windowDefinition = null)
         val outcome = repository(rules = listOf(rule), usageByPackage = mapOf("app.a" to 999_999)).evaluate()
         assertEquals(BlockDecision.ALLOW, outcome.decision)
+    }
+
+    @Test
+    fun `active focus session blocks a listed package`() = runTest {
+        val session = focusSession(blockedPackages = listOf("app.a"), startTs = fixedNow - 60_000)
+        val outcome = repository(focusSessions = listOf(session)).evaluate()
+        assertEquals(BlockDecision.BLOCK, outcome.decision)
+    }
+
+    @Test
+    fun `scheduled future focus session does not yet block`() = runTest {
+        val session = focusSession(blockedPackages = listOf("app.a"), startTs = fixedNow + 60_000)
+        val outcome = repository(focusSessions = listOf(session)).evaluate()
+        assertEquals(BlockDecision.ALLOW, outcome.decision)
+    }
+
+    @Test
+    fun `completed focus session does not block`() = runTest {
+        val session = focusSession(
+            blockedPackages = listOf("app.a"),
+            startTs = fixedNow - 3_600_000,
+            plannedMinutes = 25,
+            endTs = fixedNow - 100_000,
+            completedMinutes = 25
+        )
+        val outcome = repository(focusSessions = listOf(session)).evaluate()
+        assertEquals(BlockDecision.ALLOW, outcome.decision)
+    }
+
+    @Test
+    fun `interrupted focus session does not block`() = runTest {
+        val session = focusSession(
+            blockedPackages = listOf("app.a"),
+            startTs = fixedNow - 3_600_000,
+            plannedMinutes = 25,
+            endTs = fixedNow - 100_000,
+            completedMinutes = 5
+        )
+        val outcome = repository(focusSessions = listOf(session)).evaluate()
+        assertEquals(BlockDecision.ALLOW, outcome.decision)
+    }
+
+    @Test
+    fun `allow list overrides an active focus-session block`() = runTest {
+        val session = focusSession(blockedPackages = listOf("app.a"), startTs = fixedNow - 60_000)
+        val entry = AppListEntryEntity(packageName = "app.a", listType = "allow")
+        val outcome = repository(focusSessions = listOf(session), listEntries = listOf(entry)).evaluate()
+        assertEquals(BlockDecision.ALLOW, outcome.decision)
+    }
+
+    @Test
+    fun `two concurrently-active focus sessions with different package lists both apply`() = runTest {
+        val sessionForA = focusSession(blockedPackages = listOf("app.a"), startTs = fixedNow - 60_000)
+        val sessionForOther = focusSession(blockedPackages = listOf("app.other"), startTs = fixedNow - 60_000)
+        val outcome = repository(focusSessions = listOf(sessionForA, sessionForOther)).evaluate()
+        assertEquals(BlockDecision.BLOCK, outcome.decision)
+    }
+
+    @Test
+    fun `two overlapping schedule rules targeting the same package resolve deterministically`() = runTest {
+        // Both active at fixedNow (Monday noon) -> still a single clean BLOCK, not a conflict.
+        val ruleA = RuleEntity(id = 1, type = "schedule", targetPackageOrCategory = "app.a", threshold = null, windowDefinition = null)
+        val ruleB = RuleEntity(id = 2, type = "schedule", targetPackageOrCategory = "app.a", threshold = null, windowDefinition = null)
+        val scheduleA = ScheduleEntity(name = "Morning", daysOfWeek = "MON", startTime = "08:00", endTime = "14:00", associatedRuleId = 1)
+        val scheduleB = ScheduleEntity(name = "Midday", daysOfWeek = "MON", startTime = "11:00", endTime = "17:00", associatedRuleId = 2)
+        val outcome = repository(
+            rules = listOf(ruleA, ruleB),
+            schedulesByRule = mapOf(1L to listOf(scheduleA), 2L to listOf(scheduleB))
+        ).evaluate()
+        assertEquals(BlockDecision.BLOCK, outcome.decision)
+    }
+
+    @Test
+    fun `schedule evaluation respects a non-UTC zone`() = runTest {
+        // 2024-01-01T12:00:00Z is 2024-01-01T17:30 IST (UTC+5:30) -- still Monday, still inside 09:00-18:00.
+        val kolkata = ZoneId.of("Asia/Kolkata")
+        val rule = RuleEntity(id = 1, type = "schedule", targetPackageOrCategory = "app.a", threshold = null, windowDefinition = null)
+        val schedule = ScheduleEntity(name = "IST work hours", daysOfWeek = "MON", startTime = "09:00", endTime = "18:00", associatedRuleId = 1)
+        val outcome = repository(
+            rules = listOf(rule),
+            schedulesByRule = mapOf(1L to listOf(schedule)),
+            zoneId = kolkata
+        ).evaluate()
+        assertEquals(BlockDecision.BLOCK, outcome.decision)
     }
 }

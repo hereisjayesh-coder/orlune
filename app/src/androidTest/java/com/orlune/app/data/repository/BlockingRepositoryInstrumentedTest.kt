@@ -8,6 +8,7 @@ import com.orlune.app.core.domain.rules.BlockDecision
 import com.orlune.app.data.local.OrluneDatabase
 import com.orlune.app.data.local.entity.AppListEntryEntity
 import com.orlune.app.data.local.entity.DailyUsageEntity
+import com.orlune.app.data.local.entity.FocusSessionEntity
 import com.orlune.app.data.local.entity.RuleEntity
 import com.orlune.app.data.local.entity.ScheduleEntity
 import com.orlune.app.data.local.entity.SessionEntity
@@ -63,6 +64,7 @@ class BlockingRepositoryInstrumentedTest {
             appListEntryDao = database.appListEntryDao(),
             dailyUsageDao = database.dailyUsageDao(),
             sessionDao = database.sessionDao(),
+            focusSessionDao = database.focusSessionDao(),
             ownPackageName = "com.orlune.app",
             zoneId = zone,
             nowMillis = { now }
@@ -114,7 +116,7 @@ class BlockingRepositoryInstrumentedTest {
             RuleEntity(type = "schedule", targetPackageOrCategory = "app.a", threshold = null, windowDefinition = null)
         )
         database.scheduleDao().upsert(
-            ScheduleEntity(daysOfWeek = "MON", startTime = "09:00", endTime = "17:00", associatedRuleId = ruleId)
+            ScheduleEntity(name = "Work hours", daysOfWeek = "MON", startTime = "09:00", endTime = "17:00", associatedRuleId = ruleId)
         )
 
         val outcome = repository("app.a", now).evaluate()
@@ -139,6 +141,45 @@ class BlockingRepositoryInstrumentedTest {
     @Test
     fun evaluate_noOpenSessionAllowsAndDoesNotCrash() = runTest {
         val outcome = repository(null, ts("2026-08-16T12:00:00")).evaluate()
+
+        assertEquals(BlockDecision.ALLOW, outcome.decision)
+    }
+
+    @Test
+    fun evaluate_blocksForARealActiveFocusSession() = runTest {
+        val now = ts("2026-08-16T12:00:00")
+        database.focusSessionDao().upsert(
+            FocusSessionEntity(
+                startTs = now - 60_000,
+                endTs = null,
+                plannedMinutes = 25,
+                completedMinutes = 0,
+                blockedCategoryIds = "",
+                blockedPackages = "app.a"
+            )
+        )
+
+        val outcome = repository("app.a", now).evaluate()
+
+        assertEquals(BlockDecision.BLOCK, outcome.decision)
+    }
+
+    @Test
+    fun evaluate_allowListOverridesARealActiveFocusSession() = runTest {
+        val now = ts("2026-08-16T12:00:00")
+        database.focusSessionDao().upsert(
+            FocusSessionEntity(
+                startTs = now - 60_000,
+                endTs = null,
+                plannedMinutes = 25,
+                completedMinutes = 0,
+                blockedCategoryIds = "",
+                blockedPackages = "app.a"
+            )
+        )
+        database.appListEntryDao().upsert(AppListEntryEntity(packageName = "app.a", listType = "allow"))
+
+        val outcome = repository("app.a", now).evaluate()
 
         assertEquals(BlockDecision.ALLOW, outcome.decision)
     }

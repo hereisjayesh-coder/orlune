@@ -1,5 +1,7 @@
 package com.orlune.app.data.repository
 
+import com.orlune.app.core.domain.focus.FocusSessionEngine
+import com.orlune.app.core.domain.focus.FocusSessionState
 import com.orlune.app.core.domain.rules.BlockDecision
 import com.orlune.app.core.domain.rules.BlockingEngine
 import com.orlune.app.core.domain.rules.LimitEngine
@@ -7,6 +9,7 @@ import com.orlune.app.core.domain.rules.LimitState
 import com.orlune.app.core.domain.rules.ScheduleEngine
 import com.orlune.app.data.local.dao.AppListEntryDao
 import com.orlune.app.data.local.dao.DailyUsageDao
+import com.orlune.app.data.local.dao.FocusSessionDao
 import com.orlune.app.data.local.dao.RuleDao
 import com.orlune.app.data.local.dao.ScheduleDao
 import com.orlune.app.data.local.dao.SessionDao
@@ -34,6 +37,12 @@ import java.time.ZoneId
  * past the limit" case this repository exists to catch. An open session (no `endTs`
  * yet) *is* "currently foreground," and it's already kept accurate by
  * [UsageRepository.processNewEvents], which the caller runs immediately before this.
+ *
+ * (Phase 6) An active [com.orlune.app.core.domain.focus.FocusSessionEngine] session is
+ * just another input into the same OR'd `anyTriggered` boolean below, alongside
+ * `Rule` evaluation — not a second decision path. `BlockingEngine.decide(...)` (Phase
+ * 5, unmodified) still makes the final call, so the essential-app allow-list overrides
+ * a focus-session block exactly the same way it overrides a triggered rule.
  */
 class BlockingRepository(
     private val ruleDao: RuleDao,
@@ -41,6 +50,7 @@ class BlockingRepository(
     private val appListEntryDao: AppListEntryDao,
     private val dailyUsageDao: DailyUsageDao,
     private val sessionDao: SessionDao,
+    private val focusSessionDao: FocusSessionDao,
     private val ownPackageName: String,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val nowMillis: () -> Long = System::currentTimeMillis
@@ -65,12 +75,28 @@ class BlockingRepository(
         }
 
         val rules = ruleDao.observeAll().first().filter { it.targetPackageOrCategory == packageName }
-        val anyTriggered = rules.any { isTriggered(it, openSession) }
+        val ruleTriggered = rules.any { isTriggered(it, openSession) }
+        val focusTriggered = isBlockedByActiveFocusSession(packageName)
+        val anyTriggered = ruleTriggered || focusTriggered
 
         val listEntries = appListEntryDao.observeByType("block").first() +
             appListEntryDao.observeByType("allow").first()
 
         return Outcome(packageName, BlockingEngine.decide(packageName, listEntries, anyTriggered))
+    }
+
+    /**
+     * Any currently-[FocusSessionState.ACTIVE] session whose blocked-package list
+     * includes [packageName] triggers a block — multiple concurrently-active sessions
+     * simply union their blocked packages (same OR-combination the rule check above
+     * already uses), so overlap is deterministic without any special-casing.
+     */
+    private suspend fun isBlockedByActiveFocusSession(packageName: String): Boolean {
+        val now = nowMillis()
+        return focusSessionDao.observeAll().first().any { session ->
+            FocusSessionEngine.stateOf(session, now) == FocusSessionState.ACTIVE &&
+                packageName in FocusSessionEngine.blockedPackages(session)
+        }
     }
 
     /** Malformed/incomplete rule data is treated as not-triggered, never as "block everything." */

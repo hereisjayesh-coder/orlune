@@ -44,6 +44,12 @@ import com.orlune.app.data.local.entity.UserPreferenceEntity
  * Never backed up: see `AndroidManifest.xml` (`android:allowBackup="false"`) and
  * `xml/data_extraction_rules.xml`, both part of the local-only privacy architecture
  * (Section 10), not this class's concern to re-enforce.
+ *
+ * version 2 (Phase 6): `ScheduleEntity.name` and `FocusSessionEntity.blockedPackages`
+ * added. No migration written — `OrluneApplication`'s `Room.databaseBuilder` uses
+ * `fallbackToDestructiveMigration()` since there's no real user base yet and no
+ * migration path has ever existed (honest pre-release posture, not a shortcut around
+ * a real one).
  */
 @Database(
     entities = [
@@ -64,7 +70,7 @@ import com.orlune.app.data.local.entity.UserPreferenceEntity
         EmergencyOverrideEntity::class,
         PrivacySettingEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class OrluneDatabase : RoomDatabase() {
