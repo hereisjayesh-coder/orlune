@@ -34,10 +34,11 @@ Every dependency is recorded here before it's added, per the Phase 0 dependency 
 
 | Dependency | Version | Purpose |
 |---|---|---|
-| `junit:junit` | 4.13.2 | Local unit tests (`SessionCalculatorTest`, `UsageAggregatorTest`) |
-| `org.jetbrains.kotlinx:kotlinx-coroutines-test` | 1.11.0 | `runTest` for suspend-function tests |
+| `junit:junit` | 4.13.2 | Local unit tests (`SessionCalculatorTest`, `UsageAggregatorTest`, etc.) |
+| `org.jetbrains.kotlinx:kotlinx-coroutines-test` | 1.11.0 | `runTest` for suspend-function tests — both `testImplementation` and `androidTestImplementation` |
 | `androidx.test.ext:junit` | 1.3.0 | `AndroidJUnit4` runner for instrumentation tests |
 | `androidx.test:core` | 1.7.0 | `ApplicationProvider` for instrumentation tests |
+| `androidx.test:runner` | 1.7.0 | On-device test runner for `connectedDebugAndroidTest` — added Phase 3, was missing initially (see `TODO.md`) |
 
 ## What's deliberately absent
 

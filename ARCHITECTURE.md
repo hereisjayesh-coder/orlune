@@ -86,6 +86,37 @@ The service only ever runs while needed: started explicitly (debug UI) or automa
 
 Known, undocumented-elsewhere-until-now limitations, consistent with the platform doc: detection latency is a few seconds (not instant, no AccessibilityService); a brief flash of the blocked app before the overlay appears is possible; Android 12+ apps can opt out of overlays via `HIDE_OVERLAY_WINDOWS`; OEM background-kill (MIUI/One UI/etc.) can force-stop the service regardless of standard Doze exemptions and is not fought (no `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` request, no OEM autostart guidance UI) — the cold-start resume check only makes recovery automatic once the process does restart, it doesn't prevent the OS from killing it.
 
+## Phase 6 focus sessions & Room v1→v2 migration (verified 2026-08-16 audit)
+
+`FocusSessionEngine` (`core/domain/focus/`) is pure Kotlin, same style as Phase 4's
+rule engines: no stored status column, `stateOf()` derives `SCHEDULED`/`ACTIVE`/
+`COMPLETED`/`INTERRUPTED` from `startTs`/`endTs`/`plannedMinutes`/`completedMinutes`
+plus the current time, so a crash/reboot/restart can never leave a session in a state
+that doesn't reconcile correctly once something reads it again. `FocusSessionRepository`
+(`data/repository/`) owns persistence and lifecycle (`startSession`/
+`cancelActiveSessions`/`reconcileActiveSessions`, the last called every
+`BlockingMonitorService` tick alongside usage/blocking evaluation).
+
+Integration point: `BlockingRepository.evaluate()` OR's an active focus session's
+`blockedPackages` into the same `anyTriggered` boolean that rule evaluation produces
+— `BlockingEngine.decide()` itself (Phase 5) is unmodified, so the essential-app
+allow-list overrides a focus-session block exactly the same way it overrides a
+triggered rule. `BlockingMonitorService.hasWorkToEnforce()` also keeps the service
+alive for a `SCHEDULED` (not-yet-started) session, not just `ACTIVE` ones.
+
+This required a Room schema bump (`schedules.name`, `focus_sessions.blockedPackages`
+added), handled with an explicit, non-destructive migration
+(`OrluneMigrations.MIGRATION_1_2`, plain `ALTER TABLE ADD COLUMN ... DEFAULT ''`) —
+**never** `fallbackToDestructiveMigration()`. `OrluneDatabaseMigrationTest`
+reconstructs the real v1 schema, inserts representative data into all 16 tables, runs
+the migration, and asserts every row survived with correct values; verified passing
+on a physical device as part of this audit. See `AGENTS.MD`'s "Migration rules" for
+the standing process this established for any future schema change.
+
+This phase and migration landed in commits `96f1d51`/`96b93d4` without `TODO.md`/
+`ROADMAP.md`/`README.md` being updated at the time — a documentation-drift gap this
+audit found and fixed. See `docs/PROJECT_STATE.md` for the reconciled current status.
+
 ## Privacy architecture (enforced, not just documented)
 
 - No `INTERNET` permission exists anywhere in the manifest (source or merged build output) — verified by inspecting `app/build/intermediates/merged_manifest/**/AndroidManifest.xml` after every build that touches the manifest. Real permissions declared: `PACKAGE_USAGE_STATS` (Usage Access — functionally inert on its own; the real gate is `UsageAccessPermission`'s `AppOpsManager` check, granted by the user manually in Settings), a scoped `<queries>` `CATEGORY_LAUNCHER` filter (not `uses-permission`, and not `QUERY_ALL_PACKAGES`) for app-label lookups, and (Phase 5) `SYSTEM_ALERT_WINDOW` (block overlay, same manual-Settings-grant shape as Usage Access), `FOREGROUND_SERVICE`/`FOREGROUND_SERVICE_SPECIAL_USE` (the monitoring service), and `POST_NOTIFICATIONS` (UX only — the service runs regardless of grant).

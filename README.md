@@ -6,7 +6,14 @@ Orlune is an original product inspired by the general problem space of tools lik
 
 ## Project Status
 
-**Phase 1: Architecture & Android Project Setup — complete and verified.** `.\gradlew.bat assembleDebug` succeeds (see `TODO.md` for the exact toolchain and command). Package structure is in place per `ARCHITECTURE.md`; no features are implemented yet. See `docs/phase-0-research.md` for the full architecture, feasibility analysis, MVP scope, and phased plan, `ROADMAP.md` for phase-by-phase status, and `TODO.md` for current task-level status.
+Phases 0–5 are complete and verified (research, project setup, Room database, usage
+monitoring, deterministic rule engine, app blocking), and Phase 6 (focus sessions) is
+partially implemented — see `docs/PROJECT_STATE.md` for the current, dated snapshot
+(build/test status, known bugs, next task) and `ROADMAP.md` for phase-by-phase detail.
+`TODO.md` has full task-level history. Only a functional debug screen exists for UI so
+far — the real onboarding/home/settings UI is Phase 8.
+
+Agents picking up this repo: start with `AGENTS.MD`, then `docs/PROJECT_STATE.md`.
 
 ## Getting Started
 
@@ -27,9 +34,12 @@ Orlune is an original product inspired by the general problem space of tools lik
 
 ## Documentation
 
+- `AGENTS.MD` — standing rules for any coding agent working on this repo: product identity, forbidden technologies, architecture, privacy requirements, build/test commands, conventions
+- `docs/PROJECT_STATE.md` — dated snapshot: current phase, build/test status, known bugs, next recommended task
 - `docs/phase-0-research.md` — product architecture, competitor research, MVP scope, phased plan
 - `docs/android-platform-capabilities.md` — what the Android SDK can and can't do for usage monitoring and blocking
 - `docs/accessibility-service-compliance.md` — AccessibilityService use, disclosure, and Play compliance
 - `docs/dependency-audit.md` — every dependency in the project, with purpose/license/network/telemetry/privacy notes
 - `ARCHITECTURE.md` — as-built package structure and verified build toolchain
 - `ROADMAP.md` — phase-by-phase status
+- `TODO.md` — task-level history

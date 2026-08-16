@@ -10,7 +10,7 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 | 3 | Usage monitoring | ✅ Complete — pipeline built, unit-tested (15/15 pass), instrumentation-tested on a real device (3/3 pass), end-to-end data flow confirmed on-device |
 | 4 | Deterministic rule engine | ✅ Complete — `LimitEngine`, `ScheduleEngine`, `BlockingEngine`, `GoalEngine` built pure/unit-tested (33/33 pass); `FrictionEngine` deferred (no config field exists, MVP defers the Friction blocking level) |
 | 5 | App blocking | ✅ Complete — Usage-Access-based detection + `SYSTEM_ALERT_WINDOW` overlay, foreground-service enforcement loop, verified on a real device (limit rules, schedule rules, essential-app exemption, permission revocation/regrant, app restart, self-stop all confirmed) |
-| 6 | Scheduling & focus sessions | Not started |
+| 6 | Scheduling & focus sessions | 🟡 Partially complete — `FocusSessionEngine`/`FocusSessionRepository` built, unit-tested, and wired into `BlockingRepository`; Room v1→v2 migration shipped alongside it (see `docs/PROJECT_STATE.md`). **Landed in commits `96f1d51`/`96b93d4` without this file being updated at the time — reconciled 2026-08-16 audit.** Immediate and one-time-delayed sessions only; recurring focus scheduling not implemented — do not add without reviewing this design with the user first. No dedicated real UI (debug screen only, same as Phases 3/5). |
 | 7 | Analytics & algorithms | Not started |
 | 8 | Original UI & themes | Not started |
 | 9 | Privacy Center & data controls | Not started |
@@ -51,6 +51,26 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 - [x] Local-only: no `INTERNET` permission, no network dependency, no AccessibilityService dependency
 - [x] Fails safe: permission revocation stops the service cleanly (no crash, overlay clears); malformed/incomplete rule data never blocks; Orlune's own package is never blockable; the service self-stops (no infinite loop) the moment no rules remain or Usage Access is revoked
 - [x] Two real defects found via device testing and fixed before commit — see `TODO.md` for detail: (1) live foreground detection via a short `UsageStatsManager` polling window lost track of long-running sessions, replaced with the existing session-tracking data; (2) `WindowManager.addView`/`removeView` were called off the main thread, silently failing until diagnostic logging surfaced it
+
+## Phase 6 exit criteria (partial — see status above)
+
+- [x] `FocusSessionEngine` (pure, state derived from `startTs`/`endTs`/`plannedMinutes`/
+      `completedMinutes` + current time — no stored status column, so crash/reboot/
+      restart can't desync it) and `FocusSessionRepository` (start/reconcile/cancel),
+      both unit-tested (13 + 6 tests)
+- [x] Integrated into `BlockingRepository.evaluate()` as an OR'd trigger alongside
+      rule evaluation — an active focus session's blocked packages get the same
+      overlay enforcement and the same essential-app allow-list override as a
+      triggered rule (instrumentation-tested against a real in-memory Room DB)
+- [x] Room v1→v2 migration for the new `focus_sessions.blockedPackages` and
+      `schedules.name` columns — explicit, non-destructive, tested against real
+      reconstructed v1 data for all 16 tables, re-verified on a physical device
+- [ ] No real UI — only reachable via `MainActivity`'s debug screen form
+- [ ] Recurring focus-session scheduling — explicitly not built; one-time
+      immediate/delayed sessions only
+- [ ] Boundary validation for non-positive `plannedMinutes` at the repository/engine
+      level — currently only enforced by the debug UI's form, not the repository
+      itself (see `docs/PROJECT_STATE.md` known risks)
 
 ## Explicitly not started (by design, later phases)
 
