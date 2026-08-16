@@ -57,6 +57,21 @@ class BlockingEngineTest {
     }
 
     @Test
+    fun `allow entry wins even when a block entry exists for the same package`() {
+        // AppListEntryEntity's key is (packageName, listType), so both rows can
+        // coexist — regression test for a bug where list order (block-list entries
+        // concatenated before allow-list entries) silently let BLOCK win instead.
+        val entries = listOf(
+            AppListEntryEntity(packageName = "app.a", listType = "block"),
+            AppListEntryEntity(packageName = "app.a", listType = "allow")
+        )
+
+        val decision = BlockingEngine.decide("app.a", entries, anyRuleTriggered = true)
+
+        assertEquals(BlockDecision.ALLOW, decision)
+    }
+
+    @Test
     fun `listType maps raw strings to AppListType`() {
         assertEquals(AppListType.BLOCK, AppListEntryEntity(packageName = "app.a", listType = "block").listType())
         assertEquals(AppListType.ALLOW, AppListEntryEntity(packageName = "app.a", listType = "allow").listType())

@@ -23,6 +23,13 @@ fun AppListEntryEntity.listType(): AppListType? = when (listType) {
  * must override any triggered rule. An explicit BLOCK list entry wins next,
  * regardless of rule state. Otherwise the decision follows whether any rule targeting
  * this app is currently triggered.
+ *
+ * [AppListEntryEntity]'s primary key is `(packageName, listType)`, so a single package
+ * can legally have both a "block" row and an "allow" row at once (e.g. a stale block
+ * entry left behind after the app was later marked essential). Precedence is decided
+ * by entry *type*, not by which row happens to come first in [appListEntries] — a
+ * `firstOrNull` here previously let list order silently override the documented
+ * ALLOW-wins precedence.
  */
 object BlockingEngine {
 
@@ -31,11 +38,16 @@ object BlockingEngine {
         appListEntries: List<AppListEntryEntity>,
         anyRuleTriggered: Boolean
     ): BlockDecision {
-        val entryForPackage = appListEntries.firstOrNull { it.packageName == packageName }
-        return when (entryForPackage?.listType()) {
-            AppListType.ALLOW -> BlockDecision.ALLOW
-            AppListType.BLOCK -> BlockDecision.BLOCK
-            null -> if (anyRuleTriggered) BlockDecision.BLOCK else BlockDecision.ALLOW
+        val typesForPackage = appListEntries
+            .asSequence()
+            .filter { it.packageName == packageName }
+            .mapNotNull { it.listType() }
+            .toSet()
+        return when {
+            AppListType.ALLOW in typesForPackage -> BlockDecision.ALLOW
+            AppListType.BLOCK in typesForPackage -> BlockDecision.BLOCK
+            anyRuleTriggered -> BlockDecision.BLOCK
+            else -> BlockDecision.ALLOW
         }
     }
 }
