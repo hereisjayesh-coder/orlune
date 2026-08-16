@@ -7,11 +7,19 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.orlune.app.data.local.OrluneDatabase
+import com.orlune.app.data.repository.BlockingRepository
 import com.orlune.app.data.repository.UsageRepository
+import com.orlune.app.platform.blocking.BlockingMonitorService
+import com.orlune.app.platform.blocking.OverlayPermission
 import com.orlune.app.platform.usage.AppLabelResolver
+import com.orlune.app.platform.usage.UsageAccessPermission
 import com.orlune.app.platform.usage.UsageEventReader
 import com.orlune.app.platform.usage.worker.OrluneWorkerFactory
 import com.orlune.app.platform.usage.worker.UsageAggregationWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 class OrluneApplication : Application(), Configuration.Provider {
@@ -31,6 +39,17 @@ class OrluneApplication : Application(), Configuration.Provider {
         )
     }
 
+    val blockingRepository: BlockingRepository by lazy {
+        BlockingRepository(
+            ruleDao = database.ruleDao(),
+            scheduleDao = database.scheduleDao(),
+            appListEntryDao = database.appListEntryDao(),
+            dailyUsageDao = database.dailyUsageDao(),
+            sessionDao = database.sessionDao(),
+            ownPackageName = packageName
+        )
+    }
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(OrluneWorkerFactory(usageRepository))
@@ -39,6 +58,24 @@ class OrluneApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         schedulePeriodicUsageAggregation()
+        resumeMonitoringIfNeeded()
+    }
+
+    /**
+     * One-shot check at process start, not a persistent watcher: if a rule already
+     * exists and both required permissions are already granted, restart monitoring
+     * automatically so a normal app restart (including a fresh process after an OEM
+     * kill, once something does restart it) doesn't require a manual re-toggle. Never
+     * fights the OS to stay alive — it just makes recovery automatic when the process
+     * does come back.
+     */
+    private fun resumeMonitoringIfNeeded() {
+        if (!UsageAccessPermission.isGranted(this) || !OverlayPermission.isGranted(this)) return
+        CoroutineScope(Dispatchers.Default).launch {
+            if (database.ruleDao().observeAll().first().isNotEmpty()) {
+                BlockingMonitorService.start(this@OrluneApplication)
+            }
+        }
     }
 
     /**

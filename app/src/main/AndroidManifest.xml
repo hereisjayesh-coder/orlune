@@ -34,6 +34,24 @@
         </intent>
     </queries>
 
+    <!--
+        Phase 5 (App blocking). SYSTEM_ALERT_WINDOW is the platform's documented
+        mechanism for a blocking UI without AccessibilityService (Section 9) — like
+        PACKAGE_USAGE_STATS, it's a special permission the user grants manually in
+        Settings, not via a runtime dialog. FOREGROUND_SERVICE was already present
+        transitively via WorkManager (Phase 3); declared explicitly now that Phase 5
+        directly depends on it for BlockingMonitorService.
+        FOREGROUND_SERVICE_SPECIAL_USE + the specialUse type below are required by
+        Android 14+ for a foreground service that doesn't fit a more specific type.
+        POST_NOTIFICATIONS is requested for UX only — the foreground service still
+        runs and enforces rules even if this is denied, it just won't show its
+        persistent notification.
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".OrluneApplication"
         android:allowBackup="false"
@@ -69,6 +87,21 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <!--
+            Phase 5. specialUse is the closest-fitting Android 14+ foreground service
+            type for app-blocking enforcement — no more specific type (dataSync,
+            location, etc.) applies. The property value is a free-form, non-enumerated
+            description of the use case, per Android's own specialUse documentation.
+        -->
+        <service
+            android:name=".platform.blocking.BlockingMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="app_blocking" />
+        </service>
 
     </application>
 

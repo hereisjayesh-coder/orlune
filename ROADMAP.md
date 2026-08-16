@@ -9,7 +9,7 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 | 2 | Local database & domain models | ✅ Complete — all 16 Section 8 entities implemented as Room schema, verified build |
 | 3 | Usage monitoring | ✅ Complete — pipeline built, unit-tested (15/15 pass), instrumentation-tested on a real device (3/3 pass), end-to-end data flow confirmed on-device |
 | 4 | Deterministic rule engine | ✅ Complete — `LimitEngine`, `ScheduleEngine`, `BlockingEngine`, `GoalEngine` built pure/unit-tested (33/33 pass); `FrictionEngine` deferred (no config field exists, MVP defers the Friction blocking level) |
-| 5 | App blocking | Not started |
+| 5 | App blocking | ✅ Complete — Usage-Access-based detection + `SYSTEM_ALERT_WINDOW` overlay, foreground-service enforcement loop, verified on a real device (limit rules, schedule rules, essential-app exemption, permission revocation/regrant, app restart, self-stop all confirmed) |
 | 6 | Scheduling & focus sessions | Not started |
 | 7 | Analytics & algorithms | Not started |
 | 8 | Original UI & themes | Not started |
@@ -44,6 +44,14 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 - [x] No enforcement wiring yet (no repository, no WorkManager worker, no UI) — reading real `Rule`/`Schedule`/`AppListEntry` rows and applying these engines to live data is Phase 5/6's job
 - [x] No schema changes — existing Phase 2 entities already had everything these engines needed
 
+## Phase 5 exit criteria (met)
+
+- [x] Foreground app detected via `SessionDao.getOpenSessions()` (Phase 3's own session tracking), evaluated against `LimitEngine`/`ScheduleEngine`/`BlockingEngine` (Phase 4, unmodified), decision enforced by a `SYSTEM_ALERT_WINDOW` overlay drawn by a foreground `BlockingMonitorService` — the platform's documented mechanism for blocking without AccessibilityService
+- [x] Daily limit rules and scheduled rules both implemented and verified on a real device; essential-app exemptions (allow-list) verified to override a triggered rule
+- [x] Local-only: no `INTERNET` permission, no network dependency, no AccessibilityService dependency
+- [x] Fails safe: permission revocation stops the service cleanly (no crash, overlay clears); malformed/incomplete rule data never blocks; Orlune's own package is never blockable; the service self-stops (no infinite loop) the moment no rules remain or Usage Access is revoked
+- [x] Two real defects found via device testing and fixed before commit — see `TODO.md` for detail: (1) live foreground detection via a short `UsageStatsManager` polling window lost track of long-running sessions, replaced with the existing session-tracking data; (2) `WindowManager.addView`/`removeView` were called off the main thread, silently failing until diagnostic logging surfaced it
+
 ## Explicitly not started (by design, later phases)
 
-App blocking, AccessibilityService, VPN/website blocking, analytics, recommendation/wellbeing-score algorithms, monetization, accounts, cloud sync, AI/ML — none of these exist in the codebase yet. See `docs/phase-0-research.md` Section 13 (MVP scope) for what's in vs. deferred.
+Website blocking (VPN/`VpnService`), AccessibilityService (stays optional, never wired up), Friction/Strict Focus blocking levels, analytics, recommendation/wellbeing-score algorithms, monetization, accounts, cloud sync, AI/ML — none of these exist in the codebase yet. See `docs/phase-0-research.md` Section 13 (MVP scope) for what's in vs. deferred.

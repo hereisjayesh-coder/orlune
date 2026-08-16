@@ -9,12 +9,13 @@ The project is one Gradle module (`:app`), not a multi-module build. Phase 0's t
 ```
 com.orlune.app/
 ├── platform/
-│   └── usage/          UsageStatsManager integration (Phase 3)
+│   ├── usage/           UsageStatsManager integration (Phase 3)
+│   └── blocking/        Overlay/notification permissions, the block overlay, the monitoring foreground service (Phase 5)
 ├── data/
 │   ├── local/           Room database, entities, DAOs — done (Phase 2)
-│   └── repository/      Repository implementations bridging data ↔ domain (Phase 3+, once something consumes the schema)
+│   └── repository/      UsageRepository (Phase 3), BlockingRepository (Phase 5)
 ├── core/
-│   ├── domain/          Business models, use-cases (Phase 3+ — Section 8's entities *are* the domain model for now; a separate mapping layer isn't justified until a consumer needs one)
+│   ├── domain/          Business models, use-cases — `usage/` (Phase 3), `rules/` (Phase 4)
 │   ├── database/        Cross-cutting DB utilities (migrations, converters) — empty; none needed yet at schema version 1
 │   ├── privacy/         Privacy Center logic — permission status, export/delete (Phase 9)
 │   └── security/        Threat-model-driven safeguards (Phase 10)
@@ -73,10 +74,22 @@ Key decisions:
 - `UsageEventSource`/`AppLabelSource` interfaces exist specifically so `UsageRepositoryInstrumentedTest` can run the real Room database against fake platform data — real usage events aren't controllable/deterministic on a test device.
 - `OrluneApplication` implements `Configuration.Provider` to inject `UsageRepository` into `UsageAggregationWorker` via a custom `WorkerFactory` (manual DI, per Phase 0 Section 2). This requires removing WorkManager's default auto-initializer from the manifest — the meta-data key to remove is `androidx.work.WorkManagerInitializer`, not the `androidx.work.impl.WorkManagerInitializer` name older tutorials use; using the wrong name is a silent no-op (confirmed by rebuilding and grepping the merged manifest), not a build failure, so it's easy to ship broken.
 
+## Phase 5 app blocking (verified 2026-08-16)
+
+Detection reuses Phase 3's own session data rather than adding a second live-polling mechanism: `BlockingMonitorService` (`platform/blocking/`, a foreground service, `specialUse` type) runs a 3-second loop that calls the existing `UsageRepository.processNewEvents()` then asks `SessionDao.getOpenSessions()` for the currently-open session — the same source of truth `DailyUsageEntity` aggregation already depends on. `BlockingRepository` (`data/repository/`) matches that package against `RuleEntity` rows, dispatches `type` ("limit"/"schedule") to the **unmodified** Phase 4 `LimitEngine`/`ScheduleEngine`, and calls the **unmodified** `BlockingEngine.decide(...)`. The decision is enforced by `BlockOverlayController` (`platform/blocking/`) drawing a full-screen `SYSTEM_ALERT_WINDOW` — the platform's own documented mechanism for a blocking UI without AccessibilityService (see `docs/android-platform-capabilities.md`), built from plain Android `View`s rather than Compose, since hosting Compose outside an Activity needs a hand-rolled `LifecycleOwner`/`SavedStateRegistryOwner`/`ViewModelStoreOwner`.
+
+Two real bugs were caught via testing on a physical device, not caught by unit/instrumentation tests (both are Android-framework-threading/lifecycle issues that pure-JVM tests can't exercise):
+- An earlier detection design (`ForegroundAppDetector`, a live `UsageStatsManager` poll over a ~10s trailing window) silently lost track of any session open longer than that window — exactly the "user kept using the app past the limit" case blocking exists to catch. Deleted in favor of the `SessionDao.getOpenSessions()` approach above.
+- `WindowManager.addView`/`removeView` were originally called from the polling loop's `Dispatchers.Default` coroutine context, which throws (`Can't create handler inside thread ... that has not called Looper.prepare()`) — the original fail-safe `catch` block swallowed this silently until diagnostic `Log.w` calls (kept in the shipped code, not telemetry — local logcat only) surfaced it. Fixed by wrapping just the overlay calls in `withContext(Dispatchers.Main)`.
+
+The service only ever runs while needed: started explicitly (debug UI) or automatically at app cold start if a rule already exists and both Usage Access and overlay permission are granted (`OrluneApplication.resumeMonitoringIfNeeded`, a one-shot check, not a persistent watcher), and self-stops the moment no rules remain or a required permission is revoked — confirmed via `dumpsys activity services` after removing the last rule and after revoking Usage Access mid-run, in both cases with no crash and no residual foreground service.
+
+Known, undocumented-elsewhere-until-now limitations, consistent with the platform doc: detection latency is a few seconds (not instant, no AccessibilityService); a brief flash of the blocked app before the overlay appears is possible; Android 12+ apps can opt out of overlays via `HIDE_OVERLAY_WINDOWS`; OEM background-kill (MIUI/One UI/etc.) can force-stop the service regardless of standard Doze exemptions and is not fought (no `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` request, no OEM autostart guidance UI) — the cold-start resume check only makes recovery automatic once the process does restart, it doesn't prevent the OS from killing it.
+
 ## Privacy architecture (enforced, not just documented)
 
-- No `INTERNET` permission exists anywhere in the manifest (source or merged build output) — verified by inspecting `app/build/intermediates/merged_manifest/**/AndroidManifest.xml` after every build that touches the manifest. Two real permissions now exist, both required for Phase 3's actual feature: `PACKAGE_USAGE_STATS` (Usage Access — functionally inert on its own; the real gate is `UsageAccessPermission`'s `AppOpsManager` check, granted by the user manually in Settings) and a scoped `<queries>` `CATEGORY_LAUNCHER` filter (not `uses-permission`, and not `QUERY_ALL_PACKAGES`) for app-label lookups.
-- WorkManager's own library manifest transitively adds `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK`, `FOREGROUND_SERVICE`, and `ACCESS_NETWORK_STATE` — none of these were added deliberately, none are used by anything in this codebase (no `setForegroundAsync()`, no `ConnectivityManager` call), and none enable networking. `ACCESS_NETWORK_STATE` specifically only permits *querying* connectivity state; `INTERNET` is the permission that would actually allow making a request, and it's still absent.
+- No `INTERNET` permission exists anywhere in the manifest (source or merged build output) — verified by inspecting `app/build/intermediates/merged_manifest/**/AndroidManifest.xml` after every build that touches the manifest. Real permissions declared: `PACKAGE_USAGE_STATS` (Usage Access — functionally inert on its own; the real gate is `UsageAccessPermission`'s `AppOpsManager` check, granted by the user manually in Settings), a scoped `<queries>` `CATEGORY_LAUNCHER` filter (not `uses-permission`, and not `QUERY_ALL_PACKAGES`) for app-label lookups, and (Phase 5) `SYSTEM_ALERT_WINDOW` (block overlay, same manual-Settings-grant shape as Usage Access), `FOREGROUND_SERVICE`/`FOREGROUND_SERVICE_SPECIAL_USE` (the monitoring service), and `POST_NOTIFICATIONS` (UX only — the service runs regardless of grant).
+- WorkManager's own library manifest transitively adds `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK`, `FOREGROUND_SERVICE`, and `ACCESS_NETWORK_STATE` — none of these were added deliberately for that purpose, none are used for networking by anything in this codebase, and none enable it. `ACCESS_NETWORK_STATE` specifically only permits *querying* connectivity state; `INTERNET` is the permission that would actually allow making a request, and it's still absent.
 - `android:allowBackup="false"` and `xml/data_extraction_rules.xml` (empty `<cloud-backup/>` and `<device-transfer/>` rules) block both cloud backup and device-to-device transfer of app data.
 - No networking, analytics, or ad dependency exists in `app/build.gradle.kts` — see `docs/dependency-audit.md`.
 
