@@ -29,10 +29,8 @@ import java.util.concurrent.TimeUnit
 class OrluneApplication : Application(), Configuration.Provider {
 
     val database: OrluneDatabase by lazy {
-        // Version 1 -> 2 uses an explicit preserving migration; unsupported upgrades
-        // must fail rather than silently deleting local user data.
-        // has ever been written (see OrluneDatabase's version-2 KDoc) — an honest
-        // pre-release posture, not a shortcut around a real migration.
+        // Version 1 -> 2 uses an explicit preserving migration (see OrluneMigrations.kt);
+        // unsupported upgrades must fail rather than silently deleting local user data.
         Room.databaseBuilder(this, OrluneDatabase::class.java, OrluneDatabase.DATABASE_NAME)
             .addMigrations(OrluneMigrations.MIGRATION_1_2)
             .build()

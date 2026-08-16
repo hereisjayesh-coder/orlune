@@ -3,8 +3,8 @@
 **Last verification date:** 2026-08-16 (full engineering audit — repository, build,
 tests, security/privacy, docs reconciliation)
 
-**Latest verified commit:** `96b93d4` — "fix: preserve local data across Room v1 to
-v2 migration" (`main`, up to date with `origin/main`, clean working tree at audit start)
+**Latest verified commit:** `69cab3c` — "docs: add agent-handoff files" (`main`, 4
+commits ahead of `origin/main`, not pushed — push is the user's call, not automatic)
 
 This file is the living status snapshot. `AGENTS.MD` is the stable rules/conventions
 file — read that first for *how* to work on this repo, this file for *where things
