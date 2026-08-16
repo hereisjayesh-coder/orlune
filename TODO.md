@@ -25,4 +25,15 @@
 - [ ] One pre-existing, non-blocking issue: a Gradle-10-incompatibility deprecation warning originates from inside AGP 9.2.0 itself (not from this project's build files) — nothing to fix here, just something to recheck when AGP is next upgraded.
 
 ## Phase 2 — Local Database & Domain Models
-- [ ] Not started — Phase 1 is done, blocked only on explicit go-ahead to begin Phase 2
+- [x] All 16 entities from `docs/phase-0-research.md` Section 8 implemented as Room `@Entity` classes (`data/local/entity/`)
+- [x] One Room DAO per entity (`data/local/dao/`), Flow-returning queries per Phase 0 Section 2's coroutines/Flow decision
+- [x] `OrluneDatabase.kt` — single `@Database(version = 1, exportSchema = true)` wiring all 16 DAOs
+- [x] Room schema exported to `app/schemas/` and committed (baseline for future migrations)
+- [x] Room 2.8.4 + KSP 2.3.11 added — required pinning Kotlin to 2.3.20 (not 2.3.21) to exactly match the only available KSP release; see `docs/dependency-audit.md` and `ARCHITECTURE.md`
+- [x] `docs/dependency-audit.md` updated with Room/KSP/coroutines entries
+- [x] **Build verified:** `.\gradlew.bat assembleDebug --stacktrace` → `BUILD SUCCESSFUL`, `kspDebugKotlin` and `copyRoomSchemas` both ran, schema JSON confirmed to contain all 16 tables
+- [x] Re-verified: still no `INTERNET` permission or networking dependency anywhere after adding Room
+- [ ] Nothing consumes `OrluneDatabase` yet (no `Room.databaseBuilder` call) — by design, no feature needs it until Phase 3
+
+## Phase 3 — Usage Monitoring
+- [ ] Not started

@@ -11,11 +11,11 @@ com.orlune.app/
 ├── platform/
 │   └── usage/          UsageStatsManager integration (Phase 3)
 ├── data/
-│   ├── local/           Room database, DAOs (Phase 2)
-│   └── repository/      Repository implementations bridging data ↔ domain (Phase 2+)
+│   ├── local/           Room database, entities, DAOs — done (Phase 2)
+│   └── repository/      Repository implementations bridging data ↔ domain (Phase 3+, once something consumes the schema)
 ├── core/
-│   ├── domain/          Business models, use-cases (Phase 2+)
-│   ├── database/        Cross-cutting DB utilities (migrations, converters) (Phase 2)
+│   ├── domain/          Business models, use-cases (Phase 3+ — Section 8's entities *are* the domain model for now; a separate mapping layer isn't justified until a consumer needs one)
+│   ├── database/        Cross-cutting DB utilities (migrations, converters) — empty; none needed yet at schema version 1
 │   ├── privacy/         Privacy Center logic — permission status, export/delete (Phase 9)
 │   └── security/        Threat-model-driven safeguards (Phase 10)
 ├── feature/
@@ -40,7 +40,9 @@ Testing uses Android's standard source sets — `app/src/test` (JVM unit tests) 
 | JDK | 25.0.2 (JetBrains Runtime, bundled with Android Studio) | Runs the Gradle daemon; Android/Kotlin bytecode still targets JVM 17 (see below) |
 | Gradle | 9.7.0, via committed wrapper | `gradle-wrapper.jar`/`gradlew`/`gradlew.bat` are committed; never invoke a system-wide Gradle |
 | Android Gradle Plugin | 9.2.0 | Kotlin support is built in as of AGP 9.0 — no `org.jetbrains.kotlin.android` plugin applied |
-| Kotlin (compiler) | 2.3.21 | Pinned via the `org.jetbrains.kotlin.plugin.compose` plugin version, since the standalone Kotlin plugin isn't applied |
+| Kotlin (compiler) | 2.3.20 | Pinned via the `org.jetbrains.kotlin.plugin.compose` plugin version, since the standalone Kotlin plugin isn't applied. Held one patch behind the newest Kotlin (2.3.21) so it exactly matches the latest available KSP release — see below |
+| KSP | 2.3.11 | Room's annotation processor. KSP's versioning now tracks Kotlin directly; 2.3.11 targets Kotlin 2.3.20 exactly (confirmed via its own `gradle.properties`), which is why Kotlin is pinned to 2.3.20 rather than 2.3.21 |
+| Room | 2.8.4 | Local persistence (Section 8's entities). Room 3.0 exists but is alpha-only as of Aug 2026 — not used |
 | Jetpack Compose | BOM 2026.08.00 | Individual artifact versions resolved via the BOM |
 | compileSdk | 37 (Android 17) | Matches what's installed on the SDK — avoids an extra platform download |
 | targetSdk | 36 (Android 16) | Deliberately one behind compileSdk; Android 17/API 37 changes default behavior (e.g. orientation-lock handling) that hasn't been reviewed yet |
@@ -48,6 +50,16 @@ Testing uses Android's standard source sets — `app/src/test` (JVM unit tests) 
 | Build Tools | 36.0.0 | Pinned explicitly; matches what's already installed and AGP 9.2/9.3's own documented default for compileSdk 37 |
 
 **Why JDK 25 + bytecode target 17 works:** AGP 9's built-in Kotlin support infers the Kotlin compiler's `jvmTarget` from `android.compileOptions.targetCompatibility` (set to Java 17) automatically. This produces JVM-17-compatible bytecode for D8/R8 to dex, without requiring a separate installed JDK 17 toolchain (`kotlin { jvmToolchain(17) }` would force Gradle to resolve/download an exact JDK 17, which isn't needed here and was deliberately avoided given limited disk space).
+
+## Phase 2 data model (verified 2026-08-16)
+
+`data/local/entity/` implements all 16 entities from `docs/phase-0-research.md` Section 8 exactly, `data/local/dao/` has one Room DAO per entity, and `OrluneDatabase.kt` wires them into a single `@Database(version = 1, exportSchema = true)`. Schema JSON exports to `app/schemas/` (committed — this is what future migrations diff against).
+
+A few concrete decisions Section 8 left as "illustrative, not final":
+- Dates are stored as `epochDay: Long` (`java.time.LocalDate.toEpochDay()`), not a `LocalDate` column — avoids a Room `TypeConverter` for something no code reads yet.
+- `Rule.type` and `AppListEntry.listType` are plain `String` columns (documented valid values in KDoc), not enums — the rule engine that gives these values real meaning doesn't exist until Phase 4, so a Room enum `TypeConverter` today would be encoding a business rule this layer doesn't own.
+- Section 8's separate `BlockRule`/`AllowRule` rows became one `AppListEntryEntity` table with a `listType` discriminator, since they were already documented with an identical shape.
+- Nothing wires `OrluneDatabase` up yet (no `Room.databaseBuilder` call anywhere) — there's no consumer. KSP still fully validates the schema at compile time regardless, which is what "Room schema... " actually requires as a Phase 2 exit criterion.
 
 ## Privacy architecture (enforced, not just documented)
 

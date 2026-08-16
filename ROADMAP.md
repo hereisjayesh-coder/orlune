@@ -6,7 +6,7 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 |---|---|---|
 | 0 | Research & feasibility | ✅ Complete, signed off 2026-08-16 |
 | 1 | Architecture & Android project setup | ✅ Complete — project scaffolded, build environment fixed and verified, `assembleDebug` succeeds |
-| 2 | Local database & domain models | Not started |
+| 2 | Local database & domain models | ✅ Complete — all 16 Section 8 entities implemented as Room schema, verified build |
 | 3 | Usage monitoring | Not started |
 | 4 | Deterministic rule engine | Not started |
 | 5 | App blocking | Not started |
@@ -24,6 +24,12 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 - [x] Gradle/Kotlin/Compose project compiles (`.\gradlew.bat assembleDebug` — BUILD SUCCESSFUL, see `TODO.md` for the exact command and toolchain versions)
 - [x] Module/package structure in place (see `ARCHITECTURE.md`)
 - [x] No features implemented — bare Compose screen only
+
+## Phase 2 exit criteria (met)
+
+- [x] Room schema from Section 8 — all 16 entities, one DAO each, exported schema JSON committed
+- [x] No migrations needed yet (schema version 1, nothing to migrate from)
+- [x] No UI — nothing reads from or writes to the database yet
 
 ## Explicitly not started (by design, later phases)
 
