@@ -46,10 +46,10 @@ import com.orlune.app.data.local.entity.UserPreferenceEntity
  * (Section 10), not this class's concern to re-enforce.
  *
  * version 2 (Phase 6): `ScheduleEntity.name` and `FocusSessionEntity.blockedPackages`
- * added. No migration written — `OrluneApplication`'s `Room.databaseBuilder` uses
- * `fallbackToDestructiveMigration()` since there's no real user base yet and no
- * migration path has ever existed (honest pre-release posture, not a shortcut around
- * a real one).
+ * added, both as `NOT NULL DEFAULT ''` so existing rows survive untouched. `OrluneApplication`'s
+ * `Room.databaseBuilder` wires up the explicit, data-preserving `OrluneMigrations.MIGRATION_1_2`
+ * — not `fallbackToDestructiveMigration()` — and `OrluneDatabaseMigrationTest` verifies
+ * every version-1 table's rows survive the upgrade. See `OrluneMigrations.kt`.
  */
 @Database(
     entities = [
