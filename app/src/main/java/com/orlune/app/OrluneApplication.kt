@@ -9,6 +9,7 @@ import androidx.work.WorkManager
 import com.orlune.app.core.domain.focus.FocusSessionEngine
 import com.orlune.app.core.domain.focus.FocusSessionState
 import com.orlune.app.data.local.OrluneDatabase
+import com.orlune.app.data.local.OrluneMigrations
 import com.orlune.app.data.repository.BlockingRepository
 import com.orlune.app.data.repository.FocusSessionRepository
 import com.orlune.app.data.repository.UsageRepository
@@ -28,11 +29,12 @@ import java.util.concurrent.TimeUnit
 class OrluneApplication : Application(), Configuration.Provider {
 
     val database: OrluneDatabase by lazy {
-        // fallbackToDestructiveMigration: no real user base yet and no migration path
+        // Version 1 -> 2 uses an explicit preserving migration; unsupported upgrades
+        // must fail rather than silently deleting local user data.
         // has ever been written (see OrluneDatabase's version-2 KDoc) — an honest
         // pre-release posture, not a shortcut around a real migration.
         Room.databaseBuilder(this, OrluneDatabase::class.java, OrluneDatabase.DATABASE_NAME)
-            .fallbackToDestructiveMigration()
+            .addMigrations(OrluneMigrations.MIGRATION_1_2)
             .build()
     }
 
