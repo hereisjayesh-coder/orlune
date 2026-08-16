@@ -17,4 +17,7 @@ interface AppDao {
 
     @Query("SELECT * FROM apps")
     fun observeAll(): Flow<List<AppEntity>>
+
+    @Query("SELECT * FROM apps WHERE packageName = :packageName LIMIT 1")
+    suspend fun get(packageName: String): AppEntity?
 }

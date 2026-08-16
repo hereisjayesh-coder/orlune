@@ -20,4 +20,11 @@ interface SessionDao {
 
     @Query("SELECT * FROM sessions WHERE endTs IS NULL")
     fun observeOpenSessions(): Flow<List<SessionEntity>>
+
+    /** One-shot read for the aggregation pipeline (the Flow above is for UI observation). */
+    @Query("SELECT * FROM sessions WHERE endTs IS NULL")
+    suspend fun getOpenSessions(): List<SessionEntity>
+
+    @Query("SELECT * FROM sessions WHERE packageName = :packageName AND startTs >= :dayStartTs AND startTs < :dayEndTs AND endTs IS NOT NULL")
+    suspend fun getClosedSessionsForDay(packageName: String, dayStartTs: Long, dayEndTs: Long): List<SessionEntity>
 }

@@ -59,13 +59,26 @@ A few concrete decisions Section 8 left as "illustrative, not final":
 - Dates are stored as `epochDay: Long` (`java.time.LocalDate.toEpochDay()`), not a `LocalDate` column — avoids a Room `TypeConverter` for something no code reads yet.
 - `Rule.type` and `AppListEntry.listType` are plain `String` columns (documented valid values in KDoc), not enums — the rule engine that gives these values real meaning doesn't exist until Phase 4, so a Room enum `TypeConverter` today would be encoding a business rule this layer doesn't own.
 - Section 8's separate `BlockRule`/`AllowRule` rows became one `AppListEntryEntity` table with a `listType` discriminator, since they were already documented with an identical shape.
-- Nothing wires `OrluneDatabase` up yet (no `Room.databaseBuilder` call anywhere) — there's no consumer. KSP still fully validates the schema at compile time regardless, which is what "Room schema... " actually requires as a Phase 2 exit criterion.
+- Nothing wired `OrluneDatabase` up in Phase 2 — that's now done in Phase 3 (`OrluneApplication`), the first real consumer.
+
+## Phase 3 usage monitoring (verified 2026-08-16)
+
+Pipeline: `UsageEventReader` (platform, wraps `UsageStatsManager`) → `SessionCalculator` (pure, `core/domain/usage`) → `UsageAggregator` (pure) → `UsageRepository` (`data/repository`) persists via the Phase 2 DAOs. A periodic `UsageAggregationWorker` (WorkManager, 15 min — the minimum periodic interval, and there's no blocking-latency requirement in this phase to justify tighter polling) drives it; the debug screen in `MainActivity` triggers it on demand.
+
+Key decisions:
+- `MOVE_TO_FOREGROUND`/`MOVE_TO_BACKGROUND` are used deliberately despite being deprecated in favor of `ACTIVITY_RESUMED`/`ACTIVITY_PAUSED` — the replacement fires per-Activity, not per-app, which would fragment a single session into many spurious ones for any multi-activity app. See the KDoc on `UsageEventReader.queryEvents`.
+- Idempotency/duplicate-processing safety comes from a watermark (`UserPreferenceEntity`, key `usage.lastProcessedEventTime`), advanced to `lastEventTimestamp + 1` after each run — not from deduplicating rows after the fact.
+- Sessions crossing local midnight are split at the boundary by `SessionCalculator` before ever reaching the database, so `DailyUsageEntity` aggregation is a plain per-day sum — no session ever spans two days.
+- `DEVICE_SHUTDOWN` events close any still-open session at that timestamp, since there's no guaranteed `MOVE_TO_BACKGROUND` when the OS shuts down — handles the reboot case without needing a `BOOT_COMPLETED` receiver of our own (WorkManager reschedules its own periodic work across reboots automatically).
+- `UsageEventSource`/`AppLabelSource` interfaces exist specifically so `UsageRepositoryInstrumentedTest` can run the real Room database against fake platform data — real usage events aren't controllable/deterministic on a test device.
+- `OrluneApplication` implements `Configuration.Provider` to inject `UsageRepository` into `UsageAggregationWorker` via a custom `WorkerFactory` (manual DI, per Phase 0 Section 2). This requires removing WorkManager's default auto-initializer from the manifest — the meta-data key to remove is `androidx.work.WorkManagerInitializer`, not the `androidx.work.impl.WorkManagerInitializer` name older tutorials use; using the wrong name is a silent no-op (confirmed by rebuilding and grepping the merged manifest), not a build failure, so it's easy to ship broken.
 
 ## Privacy architecture (enforced, not just documented)
 
-- `AndroidManifest.xml` declares zero `<uses-permission>` entries. No `INTERNET` permission exists anywhere in the manifest (source or merged build output) — verified by inspecting `app/build/intermediates/merged_manifest/**/AndroidManifest.xml` after every build that touches the manifest.
+- No `INTERNET` permission exists anywhere in the manifest (source or merged build output) — verified by inspecting `app/build/intermediates/merged_manifest/**/AndroidManifest.xml` after every build that touches the manifest. Two real permissions now exist, both required for Phase 3's actual feature: `PACKAGE_USAGE_STATS` (Usage Access — functionally inert on its own; the real gate is `UsageAccessPermission`'s `AppOpsManager` check, granted by the user manually in Settings) and a scoped `<queries>` `CATEGORY_LAUNCHER` filter (not `uses-permission`, and not `QUERY_ALL_PACKAGES`) for app-label lookups.
+- WorkManager's own library manifest transitively adds `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK`, `FOREGROUND_SERVICE`, and `ACCESS_NETWORK_STATE` — none of these were added deliberately, none are used by anything in this codebase (no `setForegroundAsync()`, no `ConnectivityManager` call), and none enable networking. `ACCESS_NETWORK_STATE` specifically only permits *querying* connectivity state; `INTERNET` is the permission that would actually allow making a request, and it's still absent.
 - `android:allowBackup="false"` and `xml/data_extraction_rules.xml` (empty `<cloud-backup/>` and `<device-transfer/>` rules) block both cloud backup and device-to-device transfer of app data.
-- No networking, analytics, or ad dependency exists in `app/build.gradle.kts` — see `docs/dependency-audit.md` for the full, currently-empty-of-networking dependency list.
+- No networking, analytics, or ad dependency exists in `app/build.gradle.kts` — see `docs/dependency-audit.md`.
 
 ## Gradle environment notes (machine-specific, not project policy)
 

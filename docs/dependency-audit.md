@@ -17,6 +17,8 @@ Every dependency is recorded here before it's added, per the Phase 0 dependency 
 | `androidx.room:room-ktx` | 2.8.4 | Flow-returning DAO queries, coroutine support for Room | Apache 2.0 | None | None | None |
 | `androidx.room:room-compiler` | 2.8.4 | Annotation processor (via KSP) generating DAO implementations at compile time — not shipped in the app | Apache 2.0 | None | None | None |
 | `org.jetbrains.kotlinx:kotlinx-coroutines-android` | 1.11.0 | Structured concurrency, `Dispatchers.Main` on Android — pre-approved by Phase 0 Section 2 ("Kotlin Coroutines + Flow/StateFlow") | Apache 2.0 | None | None | None |
+| `androidx.work:work-runtime-ktx` | 2.11.2 | Periodic background usage aggregation (Phase 3) — pre-approved by Phase 0 Section 2 ("WorkManager... no network calls") | Apache 2.0 | None | None | Transitively adds `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK`, `FOREGROUND_SERVICE`, `ACCESS_NETWORK_STATE` to the manifest via its own library manifest — none used by this codebase, none enable networking (`ACCESS_NETWORK_STATE` only permits querying connectivity state). See `ARCHITECTURE.md` |
+| `androidx.lifecycle:lifecycle-runtime-compose` | 2.9.0 | Non-deprecated `LocalLifecycleOwner` for the debug screen's permission re-check on resume | Apache 2.0 | None | None | None |
 
 **Build/tooling plugins** (not shipped in the app, but part of the trusted build chain):
 
@@ -27,6 +29,15 @@ Every dependency is recorded here before it's added, per the Phase 0 dependency 
 | KSP (`com.google.devtools.ksp`) | 2.3.11 | Annotation processing for Room. KSP's version scheme now tracks Kotlin directly; 2.3.11 is the latest release and targets Kotlin 2.3.20 exactly (confirmed via its `gradle.properties`) | Apache 2.0 |
 | Room Gradle plugin (`androidx.room`) | 2.8.4 | Configures Room's schema export directory (`app/schemas/`) | Apache 2.0 |
 | Gradle | 9.7.0 | Build tool, invoked only via the committed wrapper (`gradlew`/`gradlew.bat`), never a system-wide install | Apache 2.0 |
+
+**Test-only dependencies** (never in a release build — `testImplementation`/`androidTestImplementation`):
+
+| Dependency | Version | Purpose |
+|---|---|---|
+| `junit:junit` | 4.13.2 | Local unit tests (`SessionCalculatorTest`, `UsageAggregatorTest`) |
+| `org.jetbrains.kotlinx:kotlinx-coroutines-test` | 1.11.0 | `runTest` for suspend-function tests |
+| `androidx.test.ext:junit` | 1.3.0 | `AndroidJUnit4` runner for instrumentation tests |
+| `androidx.test:core` | 1.7.0 | `ApplicationProvider` for instrumentation tests |
 
 ## What's deliberately absent
 

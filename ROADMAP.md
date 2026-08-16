@@ -7,7 +7,7 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 | 0 | Research & feasibility | ✅ Complete, signed off 2026-08-16 |
 | 1 | Architecture & Android project setup | ✅ Complete — project scaffolded, build environment fixed and verified, `assembleDebug` succeeds |
 | 2 | Local database & domain models | ✅ Complete — all 16 Section 8 entities implemented as Room schema, verified build |
-| 3 | Usage monitoring | Not started |
+| 3 | Usage monitoring | ✅ Mostly complete — pipeline built, unit-tested (15/15 pass), build verified; instrumentation tests compile but unexecuted (no device connected) |
 | 4 | Deterministic rule engine | Not started |
 | 5 | App blocking | Not started |
 | 6 | Scheduling & focus sessions | Not started |
@@ -30,6 +30,13 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 - [x] Room schema from Section 8 — all 16 entities, one DAO each, exported schema JSON committed
 - [x] No migrations needed yet (schema version 1, nothing to migrate from)
 - [x] No UI — nothing reads from or writes to the database yet
+
+## Phase 3 exit criteria (logic complete; one item pending hardware)
+
+- [x] UsageStatsManager integration, permission flow
+- [x] Raw -> aggregated pipeline, `App`/`DailyUsage`/`Session` populated
+- [x] Edge cases (midnight rollover, timezone changes, reboot, orphaned events, duplicate processing) — see `TODO.md` for specifics, including two real bugs caught and fixed during this phase
+- [ ] Confirmed working against real Room/SQLite on an actual device — instrumentation tests are written and compile, but need `.\gradlew.bat connectedDebugAndroidTest` run against a connected device to actually execute
 
 ## Explicitly not started (by design, later phases)
 

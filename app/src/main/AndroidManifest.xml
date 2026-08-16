@@ -1,14 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
-        No <uses-permission> entries here by design (Section 10, Privacy Architecture:
-        zero outbound network requests, enforced by never requesting INTERNET).
-        Permissions are added phase-by-phase, only when a real feature needs them
-        (Usage Access in Phase 3, etc.), never speculatively.
+        Permissions are added phase-by-phase, only when a real feature needs them,
+        never speculatively (Section 10, Privacy Architecture). Still true: no
+        INTERNET permission exists anywhere in this file, and never will for the
+        core product — zero outbound network requests is architectural, not just
+        policy.
+
+        PACKAGE_USAGE_STATS (Phase 3, Usage Access) cannot actually be granted via
+        this manifest declaration — its real gate is an AppOpsManager check
+        (UsageAccessPermission.kt), granted by the user manually in Settings. The
+        declaration is still required: several OEM Settings implementations only
+        list apps for the Usage Access toggle if they declare it here.
     -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!--
+        Scoped package visibility for app-label lookups (Phase 3) — deliberately
+        NOT QUERY_ALL_PACKAGES (Play-gated, Section 12.3). PACKAGE_USAGE_STATS does
+        not itself grant package visibility; this is what makes ordinary launchable
+        apps (the overwhelming majority of what shows up in usage events) resolvable
+        via PackageManager. Apps with no launcher activity fall back to their raw
+        package name (AppLabelResolver.kt) rather than crashing.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
+        android:name=".OrluneApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
@@ -26,6 +53,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            OrluneApplication supplies its own WorkManager Configuration (a custom
+            WorkerFactory so UsageAggregationWorker can be constructor-injected with
+            UsageRepository) — this disables WorkManager's default auto-initializer,
+            which would otherwise conflict with that custom configuration.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
     </application>
 

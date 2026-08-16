@@ -36,4 +36,17 @@
 - [ ] Nothing consumes `OrluneDatabase` yet (no `Room.databaseBuilder` call) — by design, no feature needs it until Phase 3
 
 ## Phase 3 — Usage Monitoring
+- [x] Usage Access permission flow: `UsageAccessPermission` (AppOpsManager check + Settings intent), functional debug-screen onboarding in `MainActivity` that re-checks on resume
+- [x] Pipeline: `UsageEventReader` -> `SessionCalculator` -> `UsageAggregator` -> `UsageRepository` -> Room, per `docs/phase-0-research.md` Section 1
+- [x] `App`, `DailyUsage`, `Session` tables populated by the pipeline (not just declared, per Phase 2)
+- [x] Edge cases handled: midnight rollover (session splitting), timezone changes (day boundaries computed at processing time, not cached), reboot (DEVICE_SHUTDOWN closes open sessions; WorkManager reschedules itself across reboots automatically), missing/orphaned events (still-open sessions carried forward across runs), duplicate processing (watermark advanced past the last-seen event — **caught and fixed a real off-by-one here**: the watermark wasn't advancing past the last event's own timestamp, which would have reprocessed it every run)
+- [x] Raw events aggregated into `DailyUsageEntity`, not retained indefinitely — `SessionEntity` rows persist (short retention per Section 8) but nothing stores raw `UsageEvents` beyond one processing pass
+- [x] `PeriodicWorkRequest` (15 min, WorkManager) drives background aggregation; manual DI via a custom `WorkerFactory` — **caught and fixed a real bug here**: the manifest's `tools:node="remove"` initially targeted the wrong meta-data key (`androidx.work.impl.WorkManagerInitializer` instead of the actual `androidx.work.WorkManagerInitializer`), which silently no-op'd and would have let WorkManager's default (uninjected) initializer win at runtime
+- [x] Unit tests: 15 tests across `SessionCalculatorTest` (11) and `UsageAggregatorTest` (4), covering pairing, midnight/multi-day splitting, orphaned/open sessions, device shutdown, duplicate foreground events, zero-length pairings — **all pass**
+- [x] Instrumentation tests: `UsageRepositoryInstrumentedTest` (3 tests) against a real in-memory Room database with fake platform sources — **compiles and builds successfully, but could not be executed**, no physical device connected (`adb devices` empty) and no emulator installed per the no-emulator-on-8GB-RAM strategy. Run `.\gradlew.bat connectedDebugAndroidTest` once a device is connected via USB debugging.
+- [x] Build verified: `.\gradlew.bat assembleDebug`, `testDebugUnitTest`, and `assembleDebugAndroidTest` all succeed
+- [x] Re-verified: still no `INTERNET` permission. Two new permissions added, both required: `PACKAGE_USAGE_STATS` (the feature itself) and a scoped `<queries>` `CATEGORY_LAUNCHER` filter (not `QUERY_ALL_PACKAGES`) for app labels. WorkManager transitively adds `RECEIVE_BOOT_COMPLETED`/`WAKE_LOCK`/`FOREGROUND_SERVICE`/`ACCESS_NETWORK_STATE` — unused by this codebase, none enable networking. See `ARCHITECTURE.md`.
+- [ ] **Not yet verified: data actually written to Room on a real device.** Logic is unit-tested and the instrumentation test's expected behavior was hand-traced against each assertion, but nobody has watched it actually pass against real Android SQLite — that requires a connected device.
+
+## Phase 4 — Deterministic Rule Engine
 - [ ] Not started
