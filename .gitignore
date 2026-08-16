@@ -22,3 +22,6 @@ build/
 /build/
 *.jks
 *.keystore
+
+# Ad-hoc device verification dumps (db pulls, screenshots) - not build artifacts, not for commit
+/.devcheck/
