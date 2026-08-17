@@ -129,8 +129,8 @@ class UsageRepository(
     }
 
     private suspend fun recomputeDailyUsage(packageName: String, epochDay: Long) {
-        val dayStart = LocalDate.ofEpochDay(epochDay).atStartOfDay(zoneId).toInstant().toEpochMilli()
-        val dayEnd = LocalDate.ofEpochDay(epochDay).plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val dayStart = epochDayStartMillis(epochDay)
+        val dayEnd = epochDayStartMillis(epochDay + 1)
         val daySessions = sessionDao.getClosedSessionsForDay(packageName, dayStart, dayEnd)
         val totals = UsageAggregator.aggregate(
             daySessions.map { ClosedSession(it.packageName, it.startTs, it.endTs!!) }
@@ -160,8 +160,13 @@ class UsageRepository(
 
     private fun todayEpochDay(): Long = epochDayOf(nowMillis())
 
-    private fun startOfToday(): Long =
-        LocalDate.now(zoneId).atStartOfDay(zoneId).toInstant().toEpochMilli()
+    // Derived from nowMillis()/zoneId (the same injectable clock as everything else
+    // in this class), not LocalDate.now() — that would read the real system clock
+    // even when nowMillis() is faked for a test, silently ignoring the injected time.
+    private fun startOfToday(): Long = epochDayStartMillis(todayEpochDay())
+
+    private fun epochDayStartMillis(epochDay: Long): Long =
+        LocalDate.ofEpochDay(epochDay).atStartOfDay(zoneId).toInstant().toEpochMilli()
 
     companion object {
         private const val WATERMARK_KEY = "usage.lastProcessedEventTime"
