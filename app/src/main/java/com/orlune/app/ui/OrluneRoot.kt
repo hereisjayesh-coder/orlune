@@ -1,5 +1,6 @@
 package com.orlune.app.ui
 
+import android.content.ActivityNotFoundException
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -41,6 +42,7 @@ import com.orlune.app.feature.settings.SettingsSection
 import com.orlune.app.platform.blocking.BlockingMonitorService
 import com.orlune.app.platform.blocking.NotificationPermission
 import com.orlune.app.platform.blocking.OverlayPermission
+import com.orlune.app.platform.feedback.FeedbackIntent
 import com.orlune.app.platform.usage.UsageAccessPermission
 import com.orlune.app.ui.navigation.OrluneTab
 import kotlinx.coroutines.launch
@@ -55,6 +57,7 @@ fun OrluneRoot(app: OrluneApplication) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
     var exportError by remember { mutableStateOf(false) }
+    var noEmailAppAvailable by remember { mutableStateOf(false) }
     val tab = OrluneTab.valueOf(selectedTab)
 
     val today = LocalDate.now().toEpochDay()
@@ -213,6 +216,13 @@ fun OrluneRoot(app: OrluneApplication) {
                     },
                     onDeleteRequest = { showDeleteDialog = true },
                     onResetRequest = { showResetDialog = true },
+                    onOpenFeedback = {
+                        try {
+                            context.startActivity(FeedbackIntent.compose())
+                        } catch (e: ActivityNotFoundException) {
+                            noEmailAppAvailable = true
+                        }
+                    },
                     sessionCount = sessionCount,
                     dailyUsageCount = dailyUsageCount,
                     ruleCount = rules.size,
@@ -265,6 +275,15 @@ fun OrluneRoot(app: OrluneApplication) {
             title = { Text("Export unavailable") },
             text = { Text("Orlune could not create the local export file. Your stored data was not changed.") },
             confirmButton = { TextButton(onClick = { exportError = false }) { Text("OK") } }
+        )
+    }
+
+    if (noEmailAppAvailable) {
+        AlertDialog(
+            onDismissRequest = { noEmailAppAvailable = false },
+            title = { Text("No email app found") },
+            text = { Text("No email app is available on this device.") },
+            confirmButton = { TextButton(onClick = { noEmailAppAvailable = false }) { Text("OK") } }
         )
     }
 }

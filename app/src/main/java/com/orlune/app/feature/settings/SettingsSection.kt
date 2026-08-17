@@ -36,6 +36,7 @@ fun SettingsSection(
     onExport: () -> Unit,
     onDeleteRequest: () -> Unit,
     onResetRequest: () -> Unit,
+    onOpenFeedback: () -> Unit,
     sessionCount: Int,
     dailyUsageCount: Int,
     ruleCount: Int,
@@ -62,6 +63,7 @@ fun SettingsSection(
                 onExport = onExport,
                 onDeleteRequest = onDeleteRequest,
                 onOpenPrivacyCenter = { backStack.add(SettingsDestination.PrivacyCenter) },
+                onOpenFeedback = onOpenFeedback,
                 onOpenAbout = { backStack.add(SettingsDestination.LegalDocument("about-orlune")) }
             )
         }

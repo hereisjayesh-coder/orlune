@@ -48,6 +48,7 @@ fun SettingsScreen(
     onExport: () -> Unit,
     onDeleteRequest: () -> Unit,
     onOpenPrivacyCenter: () -> Unit,
+    onOpenFeedback: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
     val context = LocalContext.current
@@ -90,6 +91,19 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Privacy & Legal", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenFeedback).padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Feedback", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    Text("Help improve Orlune", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

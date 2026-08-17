@@ -492,6 +492,9 @@ object LegalDocuments {
                 ## What's intentionally not built yet
                 Website/VPN blocking, Android's AccessibilityService-based detection, onboarding flow, recurring focus-session scheduling, and any analytics, recommendation, or AI/ML feature — all deliberately deferred, not overlooked.
 
+                ## Feedback
+                Settings → Feedback opens your device's own email app, addressed to the Orlune team, with a suggested subject and a blank template you fill in yourself. Orlune does not collect, store, or transmit feedback — it only hands off to whichever email app you already have installed, or tells you plainly if none is available.
+
                 ## Acknowledgements
                 Orlune is built from original design, code, and branding. It shares no code, design, or algorithms with any other digital-wellbeing app.
 

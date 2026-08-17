@@ -1,17 +1,17 @@
 # Orlune — Project State
 
-**Last verification date:** 2026-08-17 (raw package names eliminated from all normal
-UI via a live label/icon presentation layer; recurring-schedule day/time entry
-replaced with a day selector and Material time-picker; daily-limit custom duration
-replaced with a tap stepper; Insights extended with longest session / focus stats /
-limit compliance — all derived from existing local data, no AI, no fabricated stats)
+**Last verification date:** 2026-08-17 (added a local, backend-free email Feedback
+flow: Settings → Feedback hands off to the device's own email app via ACTION_SENDTO +
+a mailto URI, addressed to the Orlune team with a suggested subject/body the user can
+edit or discard — no backend, no INTERNET permission, no in-app collection, no
+analytics)
 
-**Latest verified commit:** working tree as of this file's date, on top of `58b998f`
-("feat: add initial Orlune product shell") — this session's changes are **not yet
-committed** (uncommitted working-tree changes only, not pushed) pending explicit
-instruction to commit; verify with `git log`/`git status` before trusting this file's
-claims if picking this up later; this file is a snapshot, not a substitute for
-checking the real repository state.
+**Latest verified commit:** working tree as of this file's date, on top of `30876da`
+("feat: improve app selection schedules and usage insights") — this session's changes
+are **not yet committed** (uncommitted working-tree changes only, not pushed) pending
+explicit instruction to commit; verify with `git log`/`git status` before trusting
+this file's claims if picking this up later; this file is a snapshot, not a
+substitute for checking the real repository state.
 
 This file is the living status snapshot. `AGENTS.MD` is the stable rules/conventions
 file — read that first for *how* to work on this repo, this file for *where things
@@ -22,10 +22,30 @@ significant change; keep `AGENTS.MD` stable unless a rule itself changes.
 
 ## Current phase
 
-**Phase 6 remains implemented and tested. Phase 8 (UI) advanced significantly this
-session**, focused entirely on eliminating raw package-name exposure and manual
-text-entry from normal UI — see `ROADMAP.md` for the phase table. Five isolated
-changes, each built/tested/device-verified before starting the next:
+**Phase 6 remains implemented and tested. This session added a single, small
+Feedback feature to Phase 8 (UI)** — see `ROADMAP.md` for the phase table.
+
+**Feedback (this session)**: Settings → Feedback is a new row ("Feedback" / "Help
+improve Orlune") placed between "Privacy & Legal" and "About Orlune". Tapping it calls
+`platform/feedback/FeedbackIntent.compose()`, which builds an
+`Intent(ACTION_SENDTO, Uri.parse("mailto:"))` — deliberately not `ACTION_SEND`, so
+Android resolves it against email composers only, not the general share sheet —
+addressed to `dallemahesh09@gmail.com`, subject "Orlune Feedback", and a fixed body
+template with `[User writes here]` / `Device / Android version: [optional]`
+placeholders the user fills in themselves; nothing about the device is read or
+appended automatically. `OrluneRoot.kt` wraps the `startActivity` call in a
+try/catch for `ActivityNotFoundException` and shows a plain `AlertDialog` ("No email
+app is available on this device.") instead of crashing when no handler exists. No
+manifest changes were needed or made — ACTION_SENDTO/mailto is one of Android's
+package-visibility-exempt "common intents", so no new `<queries>` entry, no new
+permission, and no `INTERNET` permission. A short "## Feedback" section was also
+added to the "About Orlune" legal document describing the same mechanism. See
+`FeedbackIntentTest.kt` for the plain-Kotlin recipient/subject/body assertions and
+the Physical-device section below for the on-device ACTION_SENDTO/dialog
+verification.
+
+Earlier this phase (prior session), five isolated changes were made, each
+built/tested/device-verified before starting the next:
 
 1. **No more raw package names anywhere in normal UI.** Home, Insights, and Limits'
    "Active rules" now resolve every package to a live label + icon via a new
@@ -66,16 +86,19 @@ Onboarding remains the largest not-yet-started piece of Phase 8.
 ## Build status — VERIFIED
 
 Ran on 2026-08-17 in this environment (`JAVA_HOME=F:\Android Stu\jbr`,
-`GRADLE_USER_HOME=F:\GradleUserHome`), after each of the five changes above and again
-at the end:
+`GRADLE_USER_HOME=F:\GradleUserHome`), after adding the Feedback feature:
 
 - `.\gradlew.bat assembleDebug --stacktrace` → **BUILD SUCCESSFUL**
-- `.\gradlew.bat testDebugUnitTest --stacktrace` → **BUILD SUCCESSFUL**, **154/154**
+- `.\gradlew.bat testDebugUnitTest --stacktrace` → **BUILD SUCCESSFUL**, **158/158**
   unit tests pass, 0 failures, 0 errors (summed from the real per-suite XML results
-  in `app/build/test-results/`)
+  in `app/build/test-results/testDebugUnitTest/`; 154 from before this session +
+  4 new in `FeedbackIntentTest`)
 - `.\gradlew.bat connectedDebugAndroidTest --stacktrace` → **BUILD SUCCESSFUL**,
   **28/28** instrumentation tests pass, run against a real physical device (Pixel 7a,
-  Android 17 / API 37, serial `32201JEHN04765`)
+  Android 17 / API 37, serial `32201JEHN04765`) — unchanged from before this session;
+  Feedback's Intent-building half isn't unit- or instrumentation-tested (no
+  Robolectric in this project, and it's simple platform glue), it's verified by the
+  on-device walkthrough below instead
 
 ## Test status — VERIFIED (real counts, not claimed)
 
@@ -93,49 +116,50 @@ at the end:
 | Unit | `FocusSessionRepositoryTest` | 8 | pass |
 | Unit | `DailyLimitInputTest` | 7 | pass |
 | Unit | `LegalDocumentsTest` | 7 | pass |
-| Unit | `AppDisplayResolverTest` (new) | 8 | pass |
-| Unit | `ScheduleInputTest` (new) | 9 | pass |
-| Unit | `DurationStepperTest` (new) | 9 | pass |
-| Unit | `InsightsMetricsTest` (new) | 10 | pass |
-| **Unit total** | | **154** | **154/154 pass** |
+| Unit | `AppDisplayResolverTest` | 8 | pass |
+| Unit | `ScheduleInputTest` | 9 | pass |
+| Unit | `DurationStepperTest` | 9 | pass |
+| Unit | `InsightsMetricsTest` | 10 | pass |
+| Unit | `FeedbackIntentTest` (new) | 4 | pass |
+| **Unit total** | | **158** | **158/158 pass** |
 | Instrumentation | `OrluneDatabaseMigrationTest` | 1 | pass (real device) |
 | Instrumentation | `BlockingRepositoryInstrumentedTest` | 8 | pass (real device) |
 | Instrumentation | `UsageRepositoryInstrumentedTest` | 7 | pass (real device) |
 | Instrumentation | `ThemePreferenceDaoInstrumentedTest` | 4 | pass (real device) |
-| Instrumentation | `InstalledAppListerInstrumentedTest` | 8 (+3 new) | pass (real device) |
+| Instrumentation | `InstalledAppListerInstrumentedTest` | 8 | pass (real device) |
 | **Instrumentation total** | | **28** | **28/28 pass** |
-| **Grand total** | | **182** | **182/182 pass** |
+| **Grand total** | | **186** | **186/186 pass** |
 
 ## Physical-device status — VERIFIED (manual walkthrough, this session)
 
-Pixel 7a connected over USB, via `adb`/`uiautomator` (text-dump verification of real
-rendered UI content, not just build success). Usage Access was temporarily granted
-for the walkthrough and reset to its prior (default/ungranted) state afterward; every
-test rule created during verification was removed afterward — device left as found.
+Pixel 7a connected over USB, via `adb`/`uiautomator` (text-dump + screenshot
+verification of real rendered UI content, not just build success). Device left as
+found afterward.
 
-- **Home**: "Most used today" showed real resolved labels ("Claude", "Drive",
-  "WhatsApp", "YouTube", **"Home screen"**) with icons, no raw package names, Orlune
-  itself absent from the list.
-- **Insights**: same resolved labels in "Apps in the last 14 days"; new "Last 14 days
-  at a glance" card confirmed showing "31m · Home screen" for longest session, real
-  focus session/time counts, and "0 of 1" for a deliberately-under-threshold test
-  limit rule (compliance line correctly absent when zero limit rules exist).
-- **Limits → Active rules**: a test limit and a test schedule rule both displayed
-  with real icon + label ("WhatsApp", "3h 30m"; "WhatsApp", "Scheduled restriction")
-  instead of a package name.
-- **Recurring schedule**: day chips and Every day/Weekdays/Weekends presets toggle
-  correctly; tapping Start/End opened a real Material `TimePicker` dialog pre-filled
-  with the current value; a schedule created with the "Every day" preset survived a
-  full `am force-stop` + relaunch.
-- **Daily limit custom duration**: +/- steppers for Hours/Minutes produced a live
-  "= 3h 30m" preview (matching the exact example from the task ask) and persisted
-  correctly into a rule.
-- Clean `logcat` throughout (`*:E AndroidRuntime:E`, filtered to `com.orlune.app`) at
-  every verification step — no `FATAL EXCEPTION`, no crash.
+**Feedback flow (this session):**
+- Settings → scrolled down → "Feedback" / "Help improve Orlune" row confirmed present
+  between "Privacy & Legal" and "About Orlune" (uiautomator text dump).
+- Tapped Feedback with Gmail installed and enabled: opened Gmail's own compose screen
+  (`com.google.android.gm`), not a general share sheet. Screenshot-verified: **To**
+  chip resolved to `dallemahesh09@gmail.com` ("M. Dalle"), **Subject** =
+  "Orlune Feedback" exactly, **Body** prefilled exactly as specified ("Hello Orlune
+  team," / "I would like to share the following feedback:" / "[User writes here]" /
+  "Device / Android version:" / "[optional]" / "Thank you."), with the cursor left in
+  the body for the user to edit. Backed out without sending; draft discarded, Orlune
+  regained foreground cleanly, no crash.
+- Fallback path: `adb shell pm disable-user --user 0 com.google.android.gm`
+  (temporary, reversed immediately after with `pm enable`), relaunched Orlune, tapped
+  Feedback again — the app showed its own `AlertDialog`, title "No email app found",
+  body "No email app is available on this device.", exactly one "OK" button; no
+  `FATAL EXCEPTION`, no `ActivityNotFoundException` crash. Gmail re-enabled and
+  confirmed no longer in the disabled-package list immediately after.
+- No `INTERNET` permission, no new manifest permission, no new `<queries>` entry —
+  confirmed via `git diff -- app/src/main/AndroidManifest.xml` showing zero changes.
 
-No new crashes were found this session (the one known crash class — Bundle-unsafe
-`SaveableStateProvider` keys — was already fixed in the prior session and remains
-fixed; unaffected by this session's changes).
+**Prior session's walkthrough** (app picker, launcher icon, Legal Center, theme
+navigation, force-stop/relaunch persistence, the Bundle-unsafe `SaveableStateProvider`
+key crash fix) is unchanged by this session — see git history for that detail if
+needed.
 
 ## Implemented features
 
@@ -168,9 +192,12 @@ fixed; unaffected by this session's changes).
   `docs/google-play-privacy-compliance.md`. "About Orlune" explicitly states no
   LICENSE file exists and Orlune is not (yet) open source — checked against the
   actual repository, not assumed.
+- **Feedback** (this session): `platform/feedback/FeedbackIntent.kt` — a local,
+  backend-free email handoff reachable from Settings → Feedback. See "Current phase"
+  above for the full mechanism.
 - Privacy architecture: no `INTERNET` permission anywhere, no analytics/ads/AI
-  dependency — re-verified this session via `git diff` showing the only manifest
-  change is the narrowly-scoped `CATEGORY_HOME` `<queries>` entry described above; no
+  dependency — re-verified this session via `git diff -- app/src/main/AndroidManifest.xml`
+  showing zero changes (the Feedback feature needed no manifest change at all); no
   changes to `app/build.gradle.kts` or `gradle/libs.versions.toml`.
 
 ## Unfinished / not started
