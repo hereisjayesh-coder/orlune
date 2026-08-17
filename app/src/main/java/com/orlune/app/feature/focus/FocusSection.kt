@@ -41,6 +41,10 @@ fun FocusSection(
     usageAccessGranted: Boolean,
     overlayGranted: Boolean,
     notificationPolicyAccessGranted: Boolean,
+    /** Seeds the notification-policy chip's initial selection — e.g. the choice
+     * previewed at onboarding Screen 6. Still freely changeable per session here;
+     * a starting point, never a lock-in. */
+    initialNotificationPolicy: FocusNotificationPolicy = FocusNotificationPolicy.ALLOW_ALL,
     onOpenOverlay: () -> Unit,
     onOpenNotificationPolicySettings: () -> Unit,
     onStart: (
@@ -61,7 +65,7 @@ fun FocusSection(
     // previously crashed from passing a non-Bundle-storable value into a Compose
     // saveable API (see docs/PROJECT_STATE.md's SaveableStateProvider incident); a
     // String is unambiguously safe, an enum's rememberSaveable support isn't worth the risk.
-    var notificationPolicyName by rememberSaveable { mutableStateOf(FocusNotificationPolicy.ALLOW_ALL.name) }
+    var notificationPolicyName by rememberSaveable { mutableStateOf(initialNotificationPolicy.name) }
     val notificationPolicy = FocusNotificationPolicy.fromStored(notificationPolicyName)
     var allowedNotificationApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
 

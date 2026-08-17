@@ -28,6 +28,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.orlune.app.OrluneApplication
+import com.orlune.app.core.domain.focus.FocusNotificationPolicy
 import com.orlune.app.core.domain.focus.FocusSessionEngine
 import com.orlune.app.core.domain.focus.FocusSessionState
 import com.orlune.app.data.local.entity.RuleEntity
@@ -38,6 +39,7 @@ import com.orlune.app.feature.focus.FocusSection
 import com.orlune.app.feature.home.HomeScreen
 import com.orlune.app.feature.insights.InsightsScreen
 import com.orlune.app.feature.limits.LimitsSection
+import com.orlune.app.feature.onboarding.OnboardingSection
 import com.orlune.app.feature.settings.SettingsSection
 import com.orlune.app.platform.blocking.BlockingMonitorService
 import com.orlune.app.platform.blocking.NotificationPermission
@@ -78,6 +80,8 @@ fun OrluneRoot(app: OrluneApplication) {
     val rules by app.database.ruleDao().observeAll().collectAsState(initial = emptyList())
     val apps by app.database.appDao().observeAll().collectAsState(initial = emptyList())
     val focusSessions by app.focusSessionRepository.observeAll().collectAsState(initial = emptyList())
+    val onboardingFocusNotificationPreference by app.onboardingRepository.observeFocusNotificationPreference()
+        .collectAsState(initial = FocusNotificationPolicy.ALLOW_ALL)
     val themePreference by app.database.themePreferenceDao().observe().collectAsState(initial = null)
     val sessionCount by app.database.sessionDao().observeCount().collectAsState(initial = 0)
     val dailyUsageCount by app.database.dailyUsageDao().observeCount().collectAsState(initial = 0)
@@ -114,6 +118,47 @@ fun OrluneRoot(app: OrluneApplication) {
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Defaults to "not completed" for the one frame before the real Room value
+    // arrives — on a true fresh install this is already correct; on an install
+    // upgrading into this feature for the first time, `backfillOnboardingCompletionForExistingInstalls`
+    // corrects it within the same cold start (a brief, one-time, self-correcting
+    // flash, not a functional issue — see docs/PROJECT_STATE.md).
+    val onboardingCompleted by app.onboardingRepository.observeCompleted().collectAsState(initial = false)
+
+    if (!onboardingCompleted) {
+        // Same Surface(background) wrapping the tab content below gets for free —
+        // without it, Text without an explicit color falls back to Compose's default
+        // LocalContentColor (black), invisible against this app's black background.
+        // Confirmed on-device: the Welcome headline was fully rendered but invisible
+        // before this fix, since Surface is what actually establishes the correct
+        // LocalContentColor for un-colored Text, not MaterialTheme alone.
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            OnboardingSection(
+                modifier = Modifier.fillMaxSize(),
+                installedAppSource = app.installedAppLister,
+                ownPackageName = context.packageName,
+                todayUsageSecondsByPackage = todayUsageSecondsByPackage,
+                usageAccessGranted = usageAccessGranted,
+                overlayGranted = overlayGranted,
+                notificationPolicyAccessGranted = notificationPolicyAccessGranted,
+                onOpenUsageAccessSettings = { context.startActivity(UsageAccessPermission.settingsIntent()) },
+                onOpenOverlaySettings = { context.startActivity(OverlayPermission.settingsIntent(context)) },
+                onOpenNotificationPolicySettings = { context.startActivity(NotificationPolicyAccessPermission.settingsIntent()) },
+                onAddLimitRule = { packageName, seconds ->
+                    scope.launch {
+                        app.database.ruleDao().upsert(
+                            RuleEntity(type = "limit", targetPackageOrCategory = packageName, threshold = seconds, windowDefinition = null)
+                        )
+                    }
+                },
+                onComplete = { goals, customGoalText, focusNotificationPreference ->
+                    scope.launch { app.onboardingRepository.complete(goals, customGoalText, focusNotificationPreference) }
+                }
+            )
+        }
+        return
     }
 
     Scaffold(
@@ -154,6 +199,7 @@ fun OrluneRoot(app: OrluneApplication) {
                     usageAccessGranted = usageAccessGranted,
                     overlayGranted = overlayGranted,
                     notificationPolicyAccessGranted = notificationPolicyAccessGranted,
+                    initialNotificationPolicy = onboardingFocusNotificationPreference,
                     onOpenOverlay = { context.startActivity(OverlayPermission.settingsIntent(context)) },
                     onOpenNotificationPolicySettings = { context.startActivity(NotificationPolicyAccessPermission.settingsIntent()) },
                     onStart = { minutes, packages, notificationPolicy, allowedNotificationPackages ->

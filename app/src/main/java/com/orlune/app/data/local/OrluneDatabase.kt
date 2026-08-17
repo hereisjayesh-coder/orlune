@@ -12,6 +12,7 @@ import com.orlune.app.data.local.dao.GoalDao
 import com.orlune.app.data.local.dao.HabitRecordDao
 import com.orlune.app.data.local.dao.LocalRecommendationDao
 import com.orlune.app.data.local.dao.NotificationPreferenceDao
+import com.orlune.app.data.local.dao.OnboardingStateDao
 import com.orlune.app.data.local.dao.PrivacySettingDao
 import com.orlune.app.data.local.dao.RuleDao
 import com.orlune.app.data.local.dao.ScheduleDao
@@ -28,6 +29,7 @@ import com.orlune.app.data.local.entity.GoalEntity
 import com.orlune.app.data.local.entity.HabitRecordEntity
 import com.orlune.app.data.local.entity.LocalRecommendationEntity
 import com.orlune.app.data.local.entity.NotificationPreferenceEntity
+import com.orlune.app.data.local.entity.OnboardingStateEntity
 import com.orlune.app.data.local.entity.PrivacySettingEntity
 import com.orlune.app.data.local.entity.RuleEntity
 import com.orlune.app.data.local.entity.ScheduleEntity
@@ -51,11 +53,19 @@ import com.orlune.app.data.local.entity.UserPreferenceEntity
  * version 3 (Phase 8, Focus notification/quiet mode): `FocusSessionEntity.notificationPolicy`
  * (`NOT NULL DEFAULT 'ALLOW_ALL'`) and `FocusSessionEntity.allowedNotificationPackages`
  * (`NOT NULL DEFAULT ''`) added — see `core/domain/focus/FocusNotificationPolicy.kt` and
- * `docs/android-notification-policy.md`. `OrluneApplication`'s `Room.databaseBuilder`
- * wires up the explicit, data-preserving `OrluneMigrations.MIGRATION_1_2` and
- * `MIGRATION_2_3` — never `fallbackToDestructiveMigration()` — and
- * `OrluneDatabaseMigrationTest` verifies every prior-version table's rows survive each
- * upgrade. See `OrluneMigrations.kt`.
+ * `docs/android-notification-policy.md`.
+ *
+ * version 4 (Phase 8, first-launch onboarding): new `onboarding_state` table
+ * (`OnboardingStateEntity`) — a new table, not an altered one, so no existing row
+ * anywhere is touched. See `docs/PROJECT_STATE.md`'s onboarding section for how an
+ * *existing* install upgrading to this version is kept from suddenly seeing
+ * onboarding pop up (an app-layer backfill in `OrluneApplication`, not this
+ * migration — onboarding is a first-*launch* concept, not a first-*version* one).
+ *
+ * `OrluneApplication`'s `Room.databaseBuilder` wires up the explicit, data-preserving
+ * `OrluneMigrations.MIGRATION_1_2`, `MIGRATION_2_3`, and `MIGRATION_3_4` — never
+ * `fallbackToDestructiveMigration()` — and `OrluneDatabaseMigrationTest` verifies
+ * every prior-version table's rows survive each upgrade. See `OrluneMigrations.kt`.
  */
 @Database(
     entities = [
@@ -74,9 +84,10 @@ import com.orlune.app.data.local.entity.UserPreferenceEntity
         UserPreferenceEntity::class,
         LocalRecommendationEntity::class,
         EmergencyOverrideEntity::class,
-        PrivacySettingEntity::class
+        PrivacySettingEntity::class,
+        OnboardingStateEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class OrluneDatabase : RoomDatabase() {
@@ -96,6 +107,7 @@ abstract class OrluneDatabase : RoomDatabase() {
     abstract fun localRecommendationDao(): LocalRecommendationDao
     abstract fun emergencyOverrideDao(): EmergencyOverrideDao
     abstract fun privacySettingDao(): PrivacySettingDao
+    abstract fun onboardingStateDao(): OnboardingStateDao
 
     companion object {
         const val DATABASE_NAME = "orlune.db"

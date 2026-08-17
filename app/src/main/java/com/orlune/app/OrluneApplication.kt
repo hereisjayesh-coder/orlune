@@ -6,6 +6,7 @@ import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.orlune.app.core.domain.focus.FocusNotificationPolicy
 import com.orlune.app.core.domain.focus.FocusSessionEngine
 import com.orlune.app.core.domain.focus.FocusSessionState
 import com.orlune.app.core.domain.focus.effectiveFocusNotificationState
@@ -13,6 +14,7 @@ import com.orlune.app.data.local.OrluneDatabase
 import com.orlune.app.data.local.OrluneMigrations
 import com.orlune.app.data.repository.BlockingRepository
 import com.orlune.app.data.repository.FocusSessionRepository
+import com.orlune.app.data.repository.OnboardingRepository
 import com.orlune.app.data.repository.UsageRepository
 import com.orlune.app.platform.blocking.BlockingMonitorService
 import com.orlune.app.platform.blocking.OverlayPermission
@@ -35,7 +37,7 @@ class OrluneApplication : Application(), Configuration.Provider {
         // Version 1 -> 2 uses an explicit preserving migration (see OrluneMigrations.kt);
         // unsupported upgrades must fail rather than silently deleting local user data.
         Room.databaseBuilder(this, OrluneDatabase::class.java, OrluneDatabase.DATABASE_NAME)
-            .addMigrations(OrluneMigrations.MIGRATION_1_2, OrluneMigrations.MIGRATION_2_3)
+            .addMigrations(OrluneMigrations.MIGRATION_1_2, OrluneMigrations.MIGRATION_2_3, OrluneMigrations.MIGRATION_3_4)
             .build()
     }
 
@@ -68,6 +70,10 @@ class OrluneApplication : Application(), Configuration.Provider {
         FocusSessionRepository(focusSessionDao = database.focusSessionDao())
     }
 
+    val onboardingRepository: OnboardingRepository by lazy {
+        OnboardingRepository(onboardingStateDao = database.onboardingStateDao())
+    }
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(OrluneWorkerFactory(usageRepository))
@@ -78,6 +84,7 @@ class OrluneApplication : Application(), Configuration.Provider {
         schedulePeriodicUsageAggregation()
         resumeMonitoringIfNeeded()
         reconcileFocusNotificationPolicyOnColdStart()
+        backfillOnboardingCompletionForExistingInstalls()
     }
 
     /**
@@ -122,6 +129,38 @@ class OrluneApplication : Application(), Configuration.Provider {
             val sessions = database.focusSessionDao().observeAll().first()
             val effective = effectiveFocusNotificationState(sessions, System.currentTimeMillis())
             FocusZenRuleController.reconcile(this@OrluneApplication, effective?.policy)
+        }
+    }
+
+    /**
+     * Onboarding (this session) is a brand-new table (`OnboardingStateEntity`, Room
+     * v3→v4) — an install that already existed before this feature shipped has no
+     * row there at all after upgrading, which [OnboardingRepository.observeCompleted]
+     * would otherwise read as "first launch, show onboarding." That's wrong:
+     * onboarding is a first-*launch* concept, not a first-*app-version* one, and an
+     * established user updating to this version must never suddenly be dropped into
+     * a first-run wizard. This one-shot check runs before anything reads the
+     * onboarding flag: if no onboarding row exists yet AND there's real evidence of
+     * prior use (any usage session, rule, or focus session ever recorded), it
+     * silently backfills a completed row with empty/default choices — never shown to
+     * the user, indistinguishable afterward from having skipped every optional
+     * onboarding choice. A genuinely fresh install has zero rows in all three tables,
+     * so onboarding still shows normally.
+     */
+    private fun backfillOnboardingCompletionForExistingInstalls() {
+        CoroutineScope(Dispatchers.Default).launch {
+            val alreadyRecorded = database.onboardingStateDao().observe().first() != null
+            if (alreadyRecorded) return@launch
+            val hasExistingData = database.sessionDao().observeCount().first() > 0 ||
+                database.ruleDao().observeAll().first().isNotEmpty() ||
+                database.focusSessionDao().observeAll().first().isNotEmpty()
+            if (hasExistingData) {
+                onboardingRepository.complete(
+                    goals = emptySet(),
+                    customGoalText = "",
+                    focusNotificationPreference = FocusNotificationPolicy.ALLOW_ALL
+                )
+            }
         }
     }
 

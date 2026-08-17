@@ -1,5 +1,73 @@
 # Orlune — TODO
 
+## First-launch onboarding — 2026-08-17
+
+- [x] 11-screen onboarding flow (`feature/onboarding/`): Welcome, What Orlune does,
+      Privacy, Usage Access, Blocking screen, Focus notifications, Goal, Choose apps,
+      Daily limit, Finish, then Home. `OnboardingSection.kt` owns one shared
+      back-stack (same `mutableStateListOf<Destination>` + `rememberSaveableStateHolder`
+      pattern as `FocusSection`/`LimitsSection`/`SettingsSection`), gated at the top
+      of `OrluneRoot.kt` — nothing else in `OrluneRoot` restructured.
+- [x] Every permission/picker/notification-policy screen **reuses** the existing
+      implementation rather than rebuilding it: `UsageAccessPermission`,
+      `OverlayPermission`, `NotificationPolicyAccessPermission`, the real
+      `NotificationPolicySelector`, the real `AppPickerScreen` (Multi mode, two new
+      optional parameters `title`/`subtitle` + an optional `onSkip` callback, both
+      backward-compatible defaults so `LimitsSection`/`FocusSection` are unaffected),
+      the real `LegalCenterScreen`/`LegalDocumentScreen`, `DurationStepper`/
+      `DailyLimitInput` for the daily-limit step.
+- [x] New pure `core/domain/onboarding/OnboardingGoal.kt` enum (10 tags, purely
+      descriptive — nothing branches on it yet, reserved for later non-AI
+      personalization per the original instruction) and new
+      `data/local/entity/OnboardingStateEntity.kt` + `OnboardingStateDao` +
+      `data/repository/OnboardingRepository.kt` (a new singleton-row table, Room
+      v3→v4, `OrluneMigrations.MIGRATION_3_4` — a new table, no existing row
+      anywhere touched). Every onboarding selection lives in Bundle-safe
+      `rememberSaveable` state during the flow and is committed to Room *once*,
+      atomically, at "Finish" — an interrupted onboarding (process death, force-quit)
+      restarts from Welcome next launch with nothing partially written.
+- [x] Finish creates one `RuleEntity(type = "limit", ...)` per selected app (only if
+      a daily limit wasn't skipped) via the exact same `ruleDao().upsert(...)` call
+      `LimitsSection`'s "Add limit" already uses — not a parallel code path.
+- [x] **Existing-install safety**: `OrluneApplication.backfillOnboardingCompletionForExistingInstalls()`
+      — an unconditional one-shot cold-start check, independent of Usage
+      Access/Overlay, that silently marks onboarding complete for an install
+      upgrading into this feature with real pre-existing data (any session, rule, or
+      focus session ever recorded), so an established user never gets shown
+      onboarding for the first time just because they updated the app. A genuinely
+      fresh install still shows onboarding normally.
+- [x] `FocusSection` gained an optional `initialNotificationPolicy` parameter
+      (default `ALLOW_ALL`, backward-compatible) — onboarding's Focus-notification
+      choice becomes the real starting default the next time the user opens Focus,
+      not a write-only field. Verified across a real app restart.
+- [x] **Real bug found and fixed via on-device testing, not code review**:
+      `OnboardingSection` was originally composed outside any `Surface`. Compose's
+      default `LocalContentColor` isn't made visible by `MaterialTheme` alone — only
+      a `Surface` does that, which the tab content already had and onboarding
+      didn't. Every un-colored title `Text` across all 11 screens rendered fully
+      present in the view tree but fully invisible (black-on-black) — caught by
+      screenshot, not by the UI-tree text dump alone, which showed the text was
+      "there." Fixed by wrapping the onboarding branch in the same
+      `Surface(color = MaterialTheme.colorScheme.background)` the tab content uses.
+      Documented as a standing rule in `AGENTS.MD` for any future top-level branch.
+- [x] 14 new unit tests (`OnboardingGoalTest` 6, `OnboardingRepositoryTest` 8) + 1 new
+      instrumentation test (`OrluneDatabaseMigrationTest.migrate3To4_...`) — 195/195
+      unit, 30/30 instrumentation, all pass.
+- [x] **Verified on the Pixel 7a**, genuine fresh install (`adb uninstall` — reported
+      a misleading internal error but the app was confirmed actually removed):
+      fresh onboarding through all 11 screens, granted real Usage Access (confirmed
+      via `appops get`), skipped the overlay permission, selected 2 real apps via
+      the real app picker, chose a 45m preset limit, completed onboarding (Finish
+      summary screenshot-confirmed exact expected format), landed on the real Home
+      tab with "Rules: 2" and two distinct `RuleEntity` rows confirmed in Limits,
+      force-stopped and restarted the app — onboarding did not reappear, and the
+      Focus tab's initial notification policy was still the onboarding-chosen
+      "Silence all". Clean logcat throughout (no `FATAL`/`AndroidRuntime: java` from
+      `com.orlune.app`).
+- [x] Zero manifest/dependency changes — confirmed via `git diff` before commit: no
+      `INTERNET` permission, no new `<queries>` entry, no new library. Onboarding
+      requests permissions only through mechanisms that already existed.
+
 ## App picker, legal documentation, and launcher icon — 2026-08-17
 
 - [x] Native app picker (`feature/apppicker/AppPickerScreen.kt`) replaced all raw

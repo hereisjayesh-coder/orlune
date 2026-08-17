@@ -12,7 +12,7 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 | 5 | App blocking | ✅ Complete — Usage-Access-based detection + `SYSTEM_ALERT_WINDOW` overlay, foreground-service enforcement loop, verified on a real device (limit rules, schedule rules, essential-app exemption, permission revocation/regrant, app restart, self-stop all confirmed) |
 | 6 | Scheduling & focus sessions | 🟡 Partially complete — `FocusSessionEngine`/`FocusSessionRepository` built, unit-tested, and wired into `BlockingRepository`; Room v1→v2 migration shipped alongside it. The Compose shell now exposes focus sessions and recurring app schedules; recurring focus sessions remain intentionally out of scope. |
 | 7 | Analytics & algorithms | Not started |
-| 8 | Original UI & themes | 🟡 Native app picker (search, real icons/labels, single/multi-select, "Frequently used today") replaced all raw package-name text input in Limits and Focus; launcher icon implemented from the approved reference (adaptive foreground/background/monochrome); Settings now has a direct "About Orlune" entry with real branding. Onboarding remains |
+| 8 | Original UI & themes | 🟡 Native app picker (search, real icons/labels, single/multi-select, "Frequently used today") replaced all raw package-name text input in Limits and Focus; launcher icon implemented from the approved reference (adaptive foreground/background/monochrome); Settings now has a direct "About Orlune" entry with real branding; Focus notification/quiet mode (per-session `AutomaticZenRule` policy) implemented and device-verified; **first-launch onboarding (11 screens) implemented and device-verified** — reuses every existing permission/picker/notification-policy implementation, commits to Room once atomically at Finish. Recurring focus-session scheduling remains deferred |
 | 9 | Privacy Center & data controls | 🟡 Privacy Center (data stored/transmitted, permissions, retention, export, delete, reset) and a 15-document Legal Center are both built and reachable from Settings, offline, in all three appearance modes. Documents are development drafts pending legal review — see `docs/legal-compliance-matrix.md` and `docs/google-play-privacy-compliance.md` |
 | 10 | Security & performance | Not started |
 | 11 | Testing | Not started |
@@ -72,6 +72,31 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
       immediate/delayed sessions only
 - [x] Repository boundary validation for focus duration and package list; malformed
       schedule rows fail safe as non-triggering during enforcement
+
+## Phase 8 exit criteria (partial — see status above)
+
+- [x] Native app picker replaced raw package-name text input in Limits and Focus
+- [x] Launcher icon from the approved reference
+- [x] Focus notification/quiet mode: per-session policy (Allow all/Silence all/Allow
+      calls/Allow calls + selected), enforced via one system-owned
+      `AutomaticZenRule` — never the older whole-device DND APIs. Device-verified;
+      two real bugs found and fixed via on-device testing. See
+      `docs/android-notification-policy.md`.
+- [x] First-launch onboarding: 11 screens (Welcome → What Orlune does → Privacy →
+      Usage Access → Blocking screen → Focus notifications → Goal → Choose apps →
+      Daily limit → Finish → Home), reusing every existing permission/picker/
+      notification-policy implementation rather than rebuilding any of them.
+      Durable completion flag (Room `onboarding_state` table); an install upgrading
+      into this feature with pre-existing data is backfilled to "already completed"
+      rather than shown onboarding for the first time on update. Device-verified
+      end-to-end including a real app restart. One real rendering bug (invisible
+      title text — missing `Surface`/`LocalContentColor`) found and fixed via
+      on-device testing. See `docs/PROJECT_STATE.md`.
+- [ ] Recurring focus-session scheduling — still explicitly deferred (Phase 6 note
+      above)
+- [ ] Dedicated Privacy Center screen exists (Phase 9), but onboarding's own goal
+      selections drive no personalization yet — reserved for later, non-AI, per the
+      original instruction
 
 ## Explicitly not started (by design, later phases)
 

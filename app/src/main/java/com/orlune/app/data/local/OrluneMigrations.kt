@@ -29,4 +29,23 @@ object OrluneMigrations {
             db.execSQL("ALTER TABLE focus_sessions ADD COLUMN allowedNotificationPackages TEXT NOT NULL DEFAULT ''")
         }
     }
+
+    /**
+     * Adds the onboarding-completion table (Phase 8, first-launch onboarding). A new
+     * table, not an altered one — no existing rows anywhere are affected. No row
+     * exists here until onboarding actually completes for the first time, on an
+     * upgrade from any prior version exactly as on a fresh install: an existing user
+     * upgrading from v1/v2/v3 sees no onboarding at all, since `OnboardingRepository`
+     * treats "no row" the same as "not shown yet" would for a genuinely new install —
+     * see `docs/PROJECT_STATE.md`'s onboarding section for why this is deliberately
+     * handled at the app layer (checking `apps`/`rules` for pre-existing data) rather
+     * than by this migration inserting a synthetic "already completed" row.
+     */
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `onboarding_state` (`id` INTEGER NOT NULL, `completed` INTEGER NOT NULL, `goals` TEXT NOT NULL, `customGoalText` TEXT NOT NULL, `focusNotificationPreference` TEXT NOT NULL, PRIMARY KEY(`id`))"
+            )
+        }
+    }
 }

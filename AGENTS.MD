@@ -64,11 +64,17 @@ data/       Room database (local/) and repositories (repository/) — the only l
 core/       Pure Kotlin business logic — domain/usage, domain/rules, domain/focus —
             no Android framework import, fully unit-testable on the JVM
 feature/    Compose UI screens, one package per screen (home/focus/limits/insights/
-            settings/privacy/apppicker implemented; onboarding still empty — deferred).
-            Screens with their own sub-navigation (app picker, Privacy/Legal Center)
-            are wrapped in a "Section" composable (e.g. LimitsSection, FocusSection,
-            SettingsSection) that owns a manual back-stack + rememberSaveableStateHolder
-            — see any of those three for the established pattern before adding a new one
+            settings/privacy/apppicker/onboarding all implemented). Screens with their
+            own sub-navigation (app picker, Privacy/Legal Center, the 11-screen
+            onboarding flow) are wrapped in a "Section" composable (e.g. LimitsSection,
+            FocusSection, SettingsSection, OnboardingSection) that owns a manual
+            back-stack + rememberSaveableStateHolder — see any of those for the
+            established pattern before adding a new one. `OnboardingSection` is the
+            largest example: an 11-step linear flow plus two side-trips (the app
+            picker, the Legal Center) on one shared back-stack, all selections in
+            Bundle-safe `rememberSaveable` state, committed to Room once and
+            atomically at "Finish" — never incrementally per screen (see
+            `docs/PROJECT_STATE.md` for why).
 platform/usage/InstalledAppLister.kt enumerates launchable apps for the app picker via
             the existing `<queries>`/CATEGORY_LAUNCHER manifest declaration — never add
             QUERY_ALL_PACKAGES; see docs/app-visibility-compliance.md for why
@@ -130,7 +136,7 @@ audit (see that file's date), status is approximately:
 | 4 | Deterministic rule engine | Complete, unit-tested |
 | 5 | App blocking | Complete, real-device verified |
 | 6 | Focus sessions & Room v1→v2 migration | Implemented; recurring focus scheduling intentionally deferred |
-| 7+ | Analytics/algorithms, onboarding, full Privacy Center, security/perf, testing, Play compliance, release | Partially started; see `docs/PROJECT_STATE.md` |
+| 7+ | Analytics/algorithms, full Privacy Center, security/perf, testing, Play compliance, release | Partially started; first-launch onboarding is done — see `docs/PROJECT_STATE.md` |
 
 **Important history note:** commits `96f1d51` and `96b93d4` added a working Phase 6
 (`FocusSessionEngine`/`FocusSessionRepository`, `blockedPackages` wired into
@@ -223,6 +229,22 @@ config. (See `docs/PROJECT_STATE.md` for why this rule exists on this project.)
   style already in `core/domain/rules/` and `core/domain/focus/`.
 - Don't rewrite working code for style. Preserve existing phases' working behavior;
   fix actual defects, don't restructure around them.
+- **Any top-level content rendered outside the tab `Scaffold`'s `Surface(color =
+  MaterialTheme.colorScheme.background)` must wrap itself in an equivalent `Surface`
+  (or otherwise establish `LocalContentColor`).** Real bug, found only by running the
+  onboarding flow on-device (first-launch onboarding milestone): `Text` with no
+  explicit `color` renders using Compose's default `LocalContentColor`, which is
+  **not** automatically set to something visible by `MaterialTheme` alone — only a
+  `Surface` (or an explicit override) does that. `OnboardingSection` was originally
+  composed directly under `OrluneRoot`, outside any `Surface`, and every un-colored
+  title `Text` (the entire `OnboardingScaffold` title, the whole Welcome headline)
+  rendered fully present in the view tree but fully invisible — black text on this
+  app's black background. Fixed by wrapping the onboarding branch in
+  `Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background)`,
+  same as the tab content already had. Any new top-level branch in `OrluneRoot.kt`
+  (a future gate/wizard/full-screen state) needs the same wrapping — it will not be
+  visually obvious in isolation, only against this app's specifically black-on-black
+  palette, and it will not fail any build or unit test.
 
 ## Git workflow
 

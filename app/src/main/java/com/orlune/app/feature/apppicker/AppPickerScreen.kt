@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,7 +60,13 @@ fun AppPickerScreen(
     ownPackageName: String,
     todayUsageSecondsByPackage: Map<String, Long>,
     mode: AppPickerMode,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    title: String = "Select apps to limit",
+    subtitle: String = "Choose the apps Orlune should help you control.",
+    /** When set, shows an explicit "Skip" action alongside "Done" in [AppPickerMode.Multi]
+     * — lets a caller (onboarding) proceed with zero apps selected without loosening
+     * "Done"'s existing enabled-only-with-a-selection rule for every other caller. */
+    onSkip: (() -> Unit)? = null
 ) {
     var apps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -99,9 +106,9 @@ fun AppPickerScreen(
             }
             Spacer(modifier = Modifier.width(4.dp))
             Column {
-                Text("Select apps to limit", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Choose the apps Orlune should help you control.",
+                    subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -127,10 +134,15 @@ fun AppPickerScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Button(
-                    onClick = { mode.onConfirm(apps.filter { it.packageName in selection }.toSet()) },
-                    enabled = selection.isNotEmpty()
-                ) { Text("Done") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (onSkip != null) {
+                        TextButton(onClick = onSkip) { Text("Skip") }
+                    }
+                    Button(
+                        onClick = { mode.onConfirm(apps.filter { it.packageName in selection }.toSet()) },
+                        enabled = selection.isNotEmpty()
+                    ) { Text("Done") }
+                }
             }
         }
 
