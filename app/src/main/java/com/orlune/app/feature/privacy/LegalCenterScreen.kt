@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -31,28 +32,33 @@ fun LegalCenterScreen(
     onBack: () -> Unit,
     onOpenDocument: (String) -> Unit
 ) {
-    LazyColumn(modifier = modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+    LazyColumn(modifier = modifier.fillMaxSize()) {
         item {
             Spacer(modifier = Modifier.height(20.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            ) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
+                Spacer(modifier = Modifier.width(4.dp))
                 Text("Privacy & Legal", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             }
             Text(
                 "Development drafts, written to match how Orlune actually works today. Not yet reviewed by a lawyer or published.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 12.dp)
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
             )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
         items(LegalDocuments.all, key = { it.id }) { document ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onOpenDocument(document.id) }
-                    .padding(vertical = 14.dp),
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -65,6 +71,6 @@ fun LegalCenterScreen(
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
-        item { Spacer(modifier = Modifier.height(20.dp)) }
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }

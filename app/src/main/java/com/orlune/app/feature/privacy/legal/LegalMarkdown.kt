@@ -2,6 +2,7 @@ package com.orlune.app.feature.privacy.legal
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -82,32 +83,49 @@ fun parseLegalBlocks(markdown: String): List<LegalBlock> {
     return blocks
 }
 
+/**
+ * Renders every block except [LegalBlock.Title] — the document's own "# " title
+ * duplicates what the caller's top bar already shows (LegalDocumentScreen), so it's
+ * parsed (for testability / potential future callers) but not displayed here.
+ */
 @Composable
 fun LegalDocumentBody(text: String, modifier: Modifier = Modifier) {
-    val blocks = remember(text) { parseLegalBlocks(text) }
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    val blocks = remember(text) { parseLegalBlocks(text).filterNot { it is LegalBlock.Title } }
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         blocks.forEach { block ->
             when (block) {
-                is LegalBlock.Title -> Text(
-                    block.text,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
+                is LegalBlock.Title -> Unit // shown by the caller's own header instead
                 is LegalBlock.Heading -> Text(
                     block.text,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 4.dp)
                 )
                 is LegalBlock.SubHeading -> Text(
                     block.text,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                is LegalBlock.Paragraph -> Text(block.text, style = MaterialTheme.typography.bodyLarge)
-                is LegalBlock.BulletList -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                is LegalBlock.Paragraph -> Text(
+                    block.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                is LegalBlock.BulletList -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     block.items.forEach { item ->
-                        Text("•  $item", style = MaterialTheme.typography.bodyLarge)
+                        Row {
+                            Text(
+                                "•",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                item,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
