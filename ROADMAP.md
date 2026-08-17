@@ -12,7 +12,7 @@ Status tracker for the phase plan defined in `docs/phase-0-research.md` Section 
 | 5 | App blocking | ✅ Complete — Usage-Access-based detection + `SYSTEM_ALERT_WINDOW` overlay, foreground-service enforcement loop, verified on a real device (limit rules, schedule rules, essential-app exemption, permission revocation/regrant, app restart, self-stop all confirmed) |
 | 6 | Scheduling & focus sessions | 🟡 Partially complete — `FocusSessionEngine`/`FocusSessionRepository` built, unit-tested, and wired into `BlockingRepository`; Room v1→v2 migration shipped alongside it. The Compose shell now exposes focus sessions and recurring app schedules; recurring focus sessions remain intentionally out of scope. |
 | 7 | Analytics & algorithms | Not started |
-| 8 | Original UI & themes | 🟡 Initial shell complete — black-first Compose navigation, Home/Focus/Limits/Insights/Settings, fixed light/dark/system themes, and branded clock icon; onboarding and visual polish remain |
+| 8 | Original UI & themes | 🟡 Initial shell complete — black-first Compose navigation, Home/Focus/Limits/Insights/Settings, fixed light/dark/system themes, and branded clock icon. Screens now split into `feature/*` modules with shared `ui/components`/`ui/navigation` per `AGENTS.MD`'s documented architecture, and the bottom nav uses real Material icons instead of text-letter placeholders; onboarding and further visual polish remain |
 | 9 | Privacy Center & data controls | 🟡 Initial controls complete — permission status, local JSON export, and delete-all; dedicated Privacy Center remains |
 | 10 | Security & performance | Not started |
 | 11 | Testing | Not started |

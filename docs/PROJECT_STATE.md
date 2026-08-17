@@ -1,9 +1,10 @@
 # Orlune — Project State
 
-**Last verification date:** 2026-08-16 (full engineering audit — repository, build,
-tests, security/privacy, docs reconciliation)
+**Last verification date:** 2026-08-17 (Compose shell reorganized into the
+documented `feature/`/`ui/components`/`ui/navigation` architecture; real Material
+icons added to the bottom nav; dead `DebugScreen` removed from `MainActivity.kt`)
 
-**Latest verified commit:** `ce637d4` — "feat: add initial Orlune product shell" (`main`; local branch remains ahead of `origin/main` until push).
+**Latest verified commit:** `79e209d` — "feat: add initial Orlune product shell" (`main`). The 2026-08-17 UI reorganization described below is **uncommitted** working-tree state on top of this commit — verify with `git status`/`git diff` before trusting this file's claims about file layout if picking this up later.
 
 This file is the living status snapshot. `AGENTS.MD` is the stable rules/conventions
 file — read that first for *how* to work on this repo, this file for *where things
@@ -15,19 +16,31 @@ significant change; keep `AGENTS.MD` stable unless a rule itself changes.
 ## Current phase
 
 **Phase 6 (Focus Sessions) and a Room v1→v2 migration are implemented and tested.**
-The initial Compose product shell and local export/delete controls are now present.
-Analytics/recommendation algorithms remain deferred.
+The initial Compose product shell and local export/delete controls are now present,
+and (as of 2026-08-17) reorganized into the architecture `AGENTS.MD` documents:
+`ui/OrluneRoot.kt` is now a thin composition root, `feature/home`, `feature/focus`,
+`feature/limits`, `feature/insights`, `feature/settings` each hold one screen, shared
+composables live in `ui/components/` (`Cards.kt`, `Rows.kt`, `EmptyState.kt`,
+`DurationFormat.kt`), and `ui/navigation/OrluneTab.kt` carries a real Material
+`ImageVector` icon per tab (replacing the previous text-letter nav icons). This was
+a pure reorganization + icon swap — no screen's layout, logic, or behavior changed.
+Analytics/recommendation algorithms and onboarding remain deferred.
 
 ## Build status — VERIFIED
 
-Ran on 2026-08-16 in this environment (`JAVA_HOME=F:\Android Stu\jbr`,
-`GRADLE_USER_HOME=F:\GradleUserHome`):
+Ran on 2026-08-17 in this environment (`JAVA_HOME=F:\Android Stu\jbr`,
+`GRADLE_USER_HOME=F:\GradleUserHome`), after the UI reorganization above:
 
-- `.\gradlew.bat assembleDebug --stacktrace` → **BUILD SUCCESSFUL**
-- `.\gradlew.bat testDebugUnitTest assembleDebug assembleDebugAndroidTest --stacktrace` → **BUILD SUCCESSFUL**, 92/92 unit tests
-  pass, 0 failures, 0 errors (first invocation that session hit a transient Gradle
-  test-event-reporter filesystem error unrelated to test content — see `AGENTS.MD`
-  test-commands section — retry succeeded cleanly)
+- `.\gradlew.bat assembleDebug --stacktrace` → **BUILD SUCCESSFUL** (first try, no
+  compile errors from the file split)
+- `.\gradlew.bat testDebugUnitTest --stacktrace` → **BUILD SUCCESSFUL**, 92/92 unit
+  tests pass, 0 failures, 0 errors (summed from the real per-suite XML results in
+  `app/build/test-results/`, not copied from a prior run)
+- `connectedDebugAndroidTest` was **NOT run this pass** — no device connectivity was
+  checked in this session. Re-run and re-verify before trusting instrumentation
+  status; don't assume the 2026-08-16 12/12 result still reflects current code
+  without re-running it, even though this change didn't touch any
+  device/instrumentation-relevant code paths.
 - `.\gradlew.bat connectedDebugAndroidTest --stacktrace` → **BUILD SUCCESSFUL**,
   12/12 instrumentation tests pass, 0 failures, run against a real physical device
   (Pixel 7a, Android 17 / API 37, serial `32201JEHN04765`)

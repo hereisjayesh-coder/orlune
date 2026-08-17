@@ -63,8 +63,11 @@ data/       Room database (local/) and repositories (repository/) — the only l
             that talks to both platform/ and core/
 core/       Pure Kotlin business logic — domain/usage, domain/rules, domain/focus —
             no Android framework import, fully unit-testable on the JVM
-feature/    Compose UI screens (mostly still empty — see Current phase below)
-ui/         Shared Compose theme/components/navigation
+feature/    Compose UI screens, one package per screen (home/focus/limits/insights/
+            settings implemented; onboarding/privacy still empty — deferred features)
+ui/         Shared Compose theme (ui/theme/), reusable components (ui/components/),
+            and the OrluneTab enum + bottom-nav wiring (ui/navigation/); OrluneRoot.kt
+            is the thin composition root that owns state and delegates to feature/
 ```
 
 Pipeline shape (usage monitoring): `UsageEventReader` (platform) → `SessionCalculator`
@@ -251,9 +254,10 @@ disabling permissions or uninstalling the app. Never describe blocking as
 
 ## Known risks (as of the last audit — see `docs/PROJECT_STATE.md` for date)
 
-- The initial real Compose shell is now the launch surface; the older `DebugScreen`
-  remains in `MainActivity.kt` only as regression/reference code. Dedicated onboarding
-  and Privacy Center screens still remain.
+- The initial real Compose shell is now the launch surface; the old `DebugScreen`
+  reference code has been removed from `MainActivity.kt` (it's now just the
+  `ComponentActivity` that sets `OrluneTheme { OrluneRoot(app) }`). Dedicated
+  onboarding and Privacy Center screens still remain.
 - `FocusSessionRepository.startSession` validates duration and package inputs. The
   engine still assumes persisted rows are structurally valid, so malformed imported
   data should continue to be treated conservatively.
