@@ -67,6 +67,19 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!--
+        Phase 8 (Focus notification/quiet mode). ACCESS_NOTIFICATION_POLICY is a
+        "normal" permission — automatically granted at install, no runtime dialog —
+        but its declaration is what makes Orlune show up at all in Settings' "Do Not
+        Disturb access" list (confirmed on-device: without this line, Orlune is
+        completely absent from that list, so the user has no way to grant it,
+        mirroring the exact same discoverability requirement PACKAGE_USAGE_STATS has
+        above). The real gate stays isNotificationPolicyAccessGranted()/"Do Not
+        Disturb access" — same manual-Settings-grant shape as Usage Access and
+        Overlay — this declaration alone grants nothing.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
     <application
         android:name=".OrluneApplication"
         android:allowBackup="false"

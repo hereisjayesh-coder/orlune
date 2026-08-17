@@ -46,10 +46,16 @@ import com.orlune.app.data.local.entity.UserPreferenceEntity
  * (Section 10), not this class's concern to re-enforce.
  *
  * version 2 (Phase 6): `ScheduleEntity.name` and `FocusSessionEntity.blockedPackages`
- * added, both as `NOT NULL DEFAULT ''` so existing rows survive untouched. `OrluneApplication`'s
- * `Room.databaseBuilder` wires up the explicit, data-preserving `OrluneMigrations.MIGRATION_1_2`
- * — not `fallbackToDestructiveMigration()` — and `OrluneDatabaseMigrationTest` verifies
- * every version-1 table's rows survive the upgrade. See `OrluneMigrations.kt`.
+ * added, both as `NOT NULL DEFAULT ''` so existing rows survive untouched.
+ *
+ * version 3 (Phase 8, Focus notification/quiet mode): `FocusSessionEntity.notificationPolicy`
+ * (`NOT NULL DEFAULT 'ALLOW_ALL'`) and `FocusSessionEntity.allowedNotificationPackages`
+ * (`NOT NULL DEFAULT ''`) added — see `core/domain/focus/FocusNotificationPolicy.kt` and
+ * `docs/android-notification-policy.md`. `OrluneApplication`'s `Room.databaseBuilder`
+ * wires up the explicit, data-preserving `OrluneMigrations.MIGRATION_1_2` and
+ * `MIGRATION_2_3` — never `fallbackToDestructiveMigration()` — and
+ * `OrluneDatabaseMigrationTest` verifies every prior-version table's rows survive each
+ * upgrade. See `OrluneMigrations.kt`.
  */
 @Database(
     entities = [
@@ -70,7 +76,7 @@ import com.orlune.app.data.local.entity.UserPreferenceEntity
         EmergencyOverrideEntity::class,
         PrivacySettingEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class OrluneDatabase : RoomDatabase() {

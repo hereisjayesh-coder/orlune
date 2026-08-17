@@ -85,7 +85,17 @@ Pipeline shape (blocking): `BlockingMonitorService` (foreground service, 3s poll
 → `BlockingRepository.evaluate()` (reads `SessionDao.getOpenSessions()` for "current
 foreground app", dispatches to `LimitEngine`/`ScheduleEngine`/`FocusSessionEngine`,
 reduces through `BlockingEngine.decide()`) → `BlockOverlayController` draws/hides a
-`SYSTEM_ALERT_WINDOW` overlay on `Dispatchers.Main`.
+`SYSTEM_ALERT_WINDOW` overlay on `Dispatchers.Main`. The same tick also reconciles
+Focus's notification policy (Phase 8): `effectiveFocusNotificationState()` (pure,
+`core/domain/focus/`) resolves the most-restrictive policy across every currently
+`ACTIVE` session, and `platform/notifications/FocusZenRuleController.kt` makes the
+single system-owned `AutomaticZenRule` it manages match — never Android's older,
+whole-device `setInterruptionFilter()`/`setNotificationPolicy()` APIs. See
+`docs/android-notification-policy.md` for the full design and two real bugs that were
+only found by testing on real hardware (the tick's "should I keep running" check has
+to run notification-policy reconciliation *before* it can decide to `stopSelf()`, not
+after — and a stray active rule needs a reconciliation pass at every process cold
+start, independent of whether `BlockingMonitorService` itself has a reason to run).
 
 Manual dependency injection throughout (constructor injection, `by lazy` in
 `OrluneApplication`) — no DI framework. Don't introduce Hilt/Koin/Dagger unless the
@@ -257,7 +267,13 @@ possible; Android 12+ apps can opt out of overlays via `HIDE_OVERLAY_WINDOWS`; O
 background-kill (MIUI/One UI/etc.) can force-stop the monitoring service regardless
 of standard Doze exemptions; there is no way to prevent a determined user from
 disabling permissions or uninstalling the app. Never describe blocking as
-"unbreakable" or monitoring as "guaranteed always-on."
+"unbreakable" or monitoring as "guaranteed always-on." Same enforcement-latency
+budget (a few seconds, not instant) applies to Focus's notification-policy
+engagement/disengagement (Phase 8) — see `docs/android-notification-policy.md`. Never
+claim Orlune guarantees emergency calls reach the user on every device: call handling
+during a Focus session ultimately depends on Android's own Do Not Disturb behavior and
+the device manufacturer's implementation of it, which is known to vary; Orlune
+configures the policy, nothing more.
 
 ## Known risks (as of the last audit — see `docs/PROJECT_STATE.md` for date)
 
@@ -270,11 +286,21 @@ disabling permissions or uninstalling the app. Never describe blocking as
   data should continue to be treated conservatively.
 - Overlapping/concurrent focus sessions are not explicitly prevented — the engine
   correctly unions blocked packages across simultaneously-active sessions, but no
-  UI/repository guard stops a user (or a caller) from starting two at once. Decide
-  deliberately whether that's desired product behavior before Phase 8.
+  UI/repository guard stops a user (or a caller) from starting two at once. **Resolved
+  for notification policy in Phase 8**: `effectiveFocusNotificationState()` explicitly
+  decides overlapping sessions by picking the single most restrictive active policy
+  (see `docs/android-notification-policy.md`) — the same question for blocking-overlay
+  behavior (which packages actually get blocked when two sessions disagree) remains
+  open and undecided.
 - `docs/dependency-audit.md`'s test-dependency table is missing `androidx.test:runner`
   and `androidx.test:core`/`kotlinx-coroutines-test` for `androidTest`, even though
   they're in `app/build.gradle.kts` — minor doc gap, not a privacy/security issue.
+- Focus's notification-policy API-29 fallback path (`FocusZenPolicyMapper`'s legacy
+  `INTERRUPTION_FILTER_*` branch) is unverified on real API 29 hardware — this
+  project's only test device is a Pixel 7a on API 37. Two real bugs in the API 30+
+  path were only found by testing on real hardware (see
+  `docs/android-notification-policy.md`); the legacy branch could have similar
+  surprises an API-29 device would need to surface.
 
 ## How to resume work
 

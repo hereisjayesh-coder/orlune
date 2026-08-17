@@ -16,7 +16,9 @@ import com.orlune.app.OrluneApplication
 import com.orlune.app.R
 import com.orlune.app.core.domain.focus.FocusSessionEngine
 import com.orlune.app.core.domain.focus.FocusSessionState
+import com.orlune.app.core.domain.focus.effectiveFocusNotificationState
 import com.orlune.app.core.domain.rules.BlockDecision
+import com.orlune.app.platform.notifications.FocusZenRuleController
 import com.orlune.app.platform.usage.UsageAccessPermission
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -99,12 +101,19 @@ class BlockingMonitorService : Service() {
                 return
             }
             if (!hasWorkToEnforce(app)) {
+                // One last reconciliation before stopping: a session that just ended or
+                // was just cancelled (Stop Focus) needs its Zen rule turned off on this
+                // very tick — there is no next tick to do it once the service stops, so
+                // skipping this would leave the rule stuck active indefinitely.
+                reconcileNotificationPolicy(app)
                 stopSelf()
                 return
             }
 
             app.usageRepository.processNewEvents()
             app.focusSessionRepository.reconcileActiveSessions()
+            reconcileNotificationPolicy(app)
+
             val outcome = app.blockingRepository.evaluate()
             Log.d(TAG, "tick: foreground=${outcome.packageName} decision=${outcome.decision}")
 
@@ -121,6 +130,12 @@ class BlockingMonitorService : Service() {
             // Fail safe: skip this tick rather than crash the service or leave a stuck overlay.
             Log.w(TAG, "tick failed, skipping", e)
         }
+    }
+
+    private suspend fun reconcileNotificationPolicy(app: OrluneApplication) {
+        val allSessions = app.database.focusSessionDao().observeAll().first()
+        val effectiveNotificationState = effectiveFocusNotificationState(allSessions, System.currentTimeMillis())
+        FocusZenRuleController.reconcile(applicationContext, effectiveNotificationState?.policy)
     }
 
     /**

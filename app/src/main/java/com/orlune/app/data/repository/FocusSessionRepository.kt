@@ -1,5 +1,6 @@
 package com.orlune.app.data.repository
 
+import com.orlune.app.core.domain.focus.FocusNotificationPolicy
 import com.orlune.app.core.domain.focus.FocusSessionEngine
 import com.orlune.app.core.domain.focus.FocusSessionState
 import com.orlune.app.data.local.dao.FocusSessionDao
@@ -19,7 +20,13 @@ class FocusSessionRepository(
 ) {
     fun observeAll(): Flow<List<FocusSessionEntity>> = focusSessionDao.observeAll()
 
-    suspend fun startSession(plannedMinutes: Int, blockedPackages: List<String>, startAt: Long = nowMillis()): Long {
+    suspend fun startSession(
+        plannedMinutes: Int,
+        blockedPackages: List<String>,
+        startAt: Long = nowMillis(),
+        notificationPolicy: FocusNotificationPolicy = FocusNotificationPolicy.ALLOW_ALL,
+        allowedNotificationPackages: List<String> = emptyList()
+    ): Long {
         require(plannedMinutes in MIN_PLANNED_MINUTES..MAX_PLANNED_MINUTES) {
             "plannedMinutes must be between $MIN_PLANNED_MINUTES and $MAX_PLANNED_MINUTES"
         }
@@ -28,6 +35,10 @@ class FocusSessionRepository(
             .filter(String::isNotEmpty)
             .distinct()
         require(normalizedPackages.isNotEmpty()) { "blockedPackages must contain at least one package" }
+        val normalizedAllowedNotificationPackages = allowedNotificationPackages
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .distinct()
 
         return focusSessionDao.upsert(
             FocusSessionEntity(
@@ -36,7 +47,9 @@ class FocusSessionRepository(
                 plannedMinutes = plannedMinutes,
                 completedMinutes = 0,
                 blockedCategoryIds = "",
-                blockedPackages = normalizedPackages.joinToString(",")
+                blockedPackages = normalizedPackages.joinToString(","),
+                notificationPolicy = notificationPolicy.name,
+                allowedNotificationPackages = normalizedAllowedNotificationPackages.joinToString(",")
             )
         )
     }

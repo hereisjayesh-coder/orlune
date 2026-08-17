@@ -13,7 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Verifies that the real version-1 schema upgrades without losing local data. */
+/** Verifies that the real version-1 and version-2 schemas upgrade without losing local data. */
 @RunWith(AndroidJUnit4::class)
 class OrluneDatabaseMigrationTest {
 
@@ -23,6 +23,44 @@ class OrluneDatabaseMigrationTest {
     fun tearDown() {
         migratedDatabase?.close()
         ApplicationProvider.getApplicationContext<Context>().deleteDatabase(DATABASE_NAME)
+    }
+
+    @Test
+    fun migrate2To3_preservesExistingFocusSessionAndUsesAllowAllDefault() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val version2Helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(DATABASE_NAME)
+                .callback(Version2Callback())
+                .build()
+        )
+        version2Helper.writableDatabase.apply {
+            execSQL(
+                "INSERT INTO focus_sessions (id, startTs, endTs, plannedMinutes, completedMinutes, blockedCategoryIds, blockedPackages) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                arrayOf<Any?>(1L, 2_000L, null, 25, 0, "", "com.example.social")
+            )
+            close()
+        }
+        version2Helper.close()
+
+        migratedDatabase = Room.databaseBuilder(context, OrluneDatabase::class.java, DATABASE_NAME)
+            .addMigrations(OrluneMigrations.MIGRATION_2_3)
+            .build()
+        val migrated = migratedDatabase!!.openHelper.writableDatabase
+
+        assertEquals(1L, countRows(migrated, "focus_sessions"))
+        migrated.query(
+            "SELECT startTs, plannedMinutes, blockedPackages, notificationPolicy, allowedNotificationPackages FROM focus_sessions"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(2_000L, cursor.getLong(0))
+            assertEquals(25, cursor.getInt(1))
+            assertEquals("com.example.social", cursor.getString(2))
+            assertEquals("ALLOW_ALL", cursor.getString(3))
+            assertEquals("", cursor.getString(4))
+        }
+
+        migrated.close()
     }
 
     @Test
@@ -41,7 +79,7 @@ class OrluneDatabaseMigrationTest {
         version1Helper.close()
 
         migratedDatabase = Room.databaseBuilder(context, OrluneDatabase::class.java, DATABASE_NAME)
-            .addMigrations(OrluneMigrations.MIGRATION_1_2)
+            .addMigrations(OrluneMigrations.MIGRATION_1_2, OrluneMigrations.MIGRATION_2_3)
             .build()
         val migrated = migratedDatabase!!.openHelper.writableDatabase
 
@@ -278,6 +316,36 @@ class OrluneDatabaseMigrationTest {
             database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_habit_records_goalId_epochDay` ON `habit_records` (`goalId`, `epochDay`)")
             database.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
             database.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES (42, 'ea884de73bad199de34f5f370fc249cd')")
+        }
+
+        override fun onUpgrade(database: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    }
+
+    /** Exact v2 schema reconstructed from app/schemas/.../2.json (v1 plus
+     * `schedules.name` and `focus_sessions.blockedPackages`, both `NOT NULL DEFAULT ''`). */
+    private class Version2Callback : SupportSQLiteOpenHelper.Callback(2) {
+        override fun onCreate(database: SupportSQLiteDatabase) {
+            database.execSQL("CREATE TABLE IF NOT EXISTS `apps` (`packageName` TEXT NOT NULL, `label` TEXT NOT NULL, `category` TEXT, `isEssential` INTEGER NOT NULL, PRIMARY KEY(`packageName`))")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `app_categories` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `isSystemDefined` INTEGER NOT NULL)")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `daily_usage` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `epochDay` INTEGER NOT NULL, `totalUsageSeconds` INTEGER NOT NULL, `launchCount` INTEGER NOT NULL, `sessionCount` INTEGER NOT NULL)")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `startTs` INTEGER NOT NULL, `endTs` INTEGER)")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `focus_sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `startTs` INTEGER NOT NULL, `endTs` INTEGER, `plannedMinutes` INTEGER NOT NULL, `completedMinutes` INTEGER NOT NULL, `blockedCategoryIds` TEXT NOT NULL, `blockedPackages` TEXT NOT NULL)")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `rules` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` TEXT NOT NULL, `targetPackageOrCategory` TEXT NOT NULL, `threshold` INTEGER, `windowDefinition` TEXT)")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `schedules` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `daysOfWeek` TEXT NOT NULL, `startTime` TEXT NOT NULL, `endTime` TEXT NOT NULL, `associatedRuleId` INTEGER NOT NULL, FOREIGN KEY(`associatedRuleId`) REFERENCES `rules`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `app_list_entries` (`packageName` TEXT NOT NULL, `listType` TEXT NOT NULL, PRIMARY KEY(`packageName`, `listType`))")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `goals` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` TEXT NOT NULL, `targetValue` INTEGER NOT NULL, `period` TEXT NOT NULL)")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `habit_records` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `epochDay` INTEGER NOT NULL, `goalId` INTEGER NOT NULL, `met` INTEGER NOT NULL, FOREIGN KEY(`goalId`) REFERENCES `goals`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `notification_preferences` (`id` INTEGER NOT NULL, `quietWindows` TEXT NOT NULL, `digestEnabled` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `theme_preferences` (`id` INTEGER NOT NULL, `themeId` TEXT NOT NULL, PRIMARY KEY(`id`))")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `user_preferences` (`key` TEXT NOT NULL, `value` TEXT NOT NULL, PRIMARY KEY(`key`))")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `local_recommendations` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `epochDay` INTEGER NOT NULL, `ruleSuggestion` TEXT NOT NULL, `basis` TEXT NOT NULL)")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `emergency_overrides` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `ruleId` INTEGER NOT NULL, `reason` TEXT)")
+            database.execSQL("CREATE TABLE IF NOT EXISTS `privacy_settings` (`permissionName` TEXT NOT NULL, `granted` INTEGER NOT NULL, `lastChecked` INTEGER NOT NULL, PRIMARY KEY(`permissionName`))")
+            database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_daily_usage_packageName_epochDay` ON `daily_usage` (`packageName`, `epochDay`)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_schedules_associatedRuleId` ON `schedules` (`associatedRuleId`)")
+            database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_habit_records_goalId_epochDay` ON `habit_records` (`goalId`, `epochDay`)")
+            database.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
+            database.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES (42, '5de2ce6aaf1849ed07085bd237a7a2c9')")
         }
 
         override fun onUpgrade(database: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit

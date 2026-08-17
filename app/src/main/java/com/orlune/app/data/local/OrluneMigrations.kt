@@ -16,4 +16,17 @@ object OrluneMigrations {
             db.execSQL("ALTER TABLE focus_sessions ADD COLUMN blockedPackages TEXT NOT NULL DEFAULT ''")
         }
     }
+
+    /**
+     * Adds Phase 8's Focus notification-policy fields. Existing rows default to
+     * `ALLOW_ALL`/`''` — a focus session created before this feature existed behaves
+     * exactly as it did before (no notification policy applied), never retroactively
+     * silences anything the user didn't ask for.
+     */
+    val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE focus_sessions ADD COLUMN notificationPolicy TEXT NOT NULL DEFAULT 'ALLOW_ALL'")
+            db.execSQL("ALTER TABLE focus_sessions ADD COLUMN allowedNotificationPackages TEXT NOT NULL DEFAULT ''")
+        }
+    }
 }

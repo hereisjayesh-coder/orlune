@@ -1,17 +1,18 @@
 # Orlune — Project State
 
-**Last verification date:** 2026-08-17 (added a local, backend-free email Feedback
-flow: Settings → Feedback hands off to the device's own email app via ACTION_SENDTO +
-a mailto URI, addressed to the Orlune team with a suggested subject/body the user can
-edit or discard — no backend, no INTERNET permission, no in-app collection, no
-analytics)
+**Last verification date:** 2026-08-17 (added Focus notification/quiet mode: a
+per-session notification policy — Allow all / Silence all / Allow calls / Allow calls
++ selected apps — enforced via a single system-owned `AutomaticZenRule`, never the
+older whole-device DND APIs. Two real bugs were found and fixed only by testing on
+real hardware; see "Current phase" below and `docs/android-notification-policy.md`
+for the full detail. `c72f7ea`'s Feedback feature is unchanged by this session.)
 
-**Latest verified commit:** working tree as of this file's date, on top of `30876da`
-("feat: improve app selection schedules and usage insights") — this session's changes
-are **not yet committed** (uncommitted working-tree changes only, not pushed) pending
-explicit instruction to commit; verify with `git log`/`git status` before trusting
-this file's claims if picking this up later; this file is a snapshot, not a
-substitute for checking the real repository state.
+**Latest verified commit:** working tree as of this file's date, on top of `c72f7ea`
+("feat: add local email feedback flow") — this session's changes are **not yet
+committed** (uncommitted working-tree changes only, not pushed) pending explicit
+instruction to commit; verify with `git log`/`git status` before trusting this file's
+claims if picking this up later; this file is a snapshot, not a substitute for
+checking the real repository state.
 
 This file is the living status snapshot. `AGENTS.MD` is the stable rules/conventions
 file — read that first for *how* to work on this repo, this file for *where things
@@ -22,29 +23,81 @@ significant change; keep `AGENTS.MD` stable unless a rule itself changes.
 
 ## Current phase
 
-**Phase 6 remains implemented and tested. This session added a single, small
-Feedback feature to Phase 8 (UI)** — see `ROADMAP.md` for the phase table.
+**Phase 6 remains implemented and tested. This session added Focus notification /
+quiet mode to Phase 8 (UI)** — see `ROADMAP.md` for the phase table.
 
-**Feedback (this session)**: Settings → Feedback is a new row ("Feedback" / "Help
-improve Orlune") placed between "Privacy & Legal" and "About Orlune". Tapping it calls
-`platform/feedback/FeedbackIntent.compose()`, which builds an
-`Intent(ACTION_SENDTO, Uri.parse("mailto:"))` — deliberately not `ACTION_SEND`, so
-Android resolves it against email composers only, not the general share sheet —
-addressed to `dallemahesh09@gmail.com`, subject "Orlune Feedback", and a fixed body
-template with `[User writes here]` / `Device / Android version: [optional]`
-placeholders the user fills in themselves; nothing about the device is read or
-appended automatically. `OrluneRoot.kt` wraps the `startActivity` call in a
-try/catch for `ActivityNotFoundException` and shows a plain `AlertDialog` ("No email
-app is available on this device.") instead of crashing when no handler exists. No
-manifest changes were needed or made — ACTION_SENDTO/mailto is one of Android's
-package-visibility-exempt "common intents", so no new `<queries>` entry, no new
-permission, and no `INTERNET` permission. A short "## Feedback" section was also
-added to the "About Orlune" legal document describing the same mechanism. See
-`FeedbackIntentTest.kt` for the plain-Kotlin recipient/subject/body assertions and
-the Physical-device section below for the on-device ACTION_SENDTO/dialog
-verification.
+**Focus notification / quiet mode (this session)** — full technical writeup in
+`docs/android-notification-policy.md`; summary here:
 
-Earlier this phase (prior session), five isolated changes were made, each
+- **Setup**: Focus screen gained a "Notification interruptions" chip selector (Allow
+  all / Silence all / Allow calls / Allow calls + selected apps —
+  `core/domain/focus/FocusNotificationPolicy.kt`), a duration-preset chip row (25m /
+  45m / 60m / 90m / Custom — `ui/components/DurationPresetSelector.kt`), and, for
+  "Allow calls + selected apps", a second app picker for the allowed-apps selection
+  (reuses `AppPickerScreen`'s existing `Multi` mode via a new `FocusSection`
+  back-stack destination). `FocusSessionEntity` gained
+  `notificationPolicy`/`allowedNotificationPackages` columns (Room v2→v3,
+  `OrluneMigrations.MIGRATION_2_3`, both `NOT NULL DEFAULT` so old rows behave exactly
+  as before — no retroactive silencing).
+- **Permission disclosure**: exactly the required copy ("Focus can silence
+  interruptions while you work. Orlune does not read or store your notification
+  content.") plus an "Open notification settings" button
+  (`Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`), shown only when the user
+  has picked a policy other than "Allow all" and access isn't yet granted — "Allow
+  all" never requests or needs this permission at all.
+- **Enforcement mechanism**: exactly one system-owned `AutomaticZenRule` ("Orlune
+  Focus"), never the older whole-device `setInterruptionFilter()`/
+  `setNotificationPolicy()` APIs. Android's own Zen Mode already combines every
+  currently-active rule (manual DND, Bedtime, other apps, this one) as "most
+  restrictive wins" — Orlune only ever toggles its own rule's `Condition`
+  (`STATE_TRUE`/`STATE_FALSE`) via `platform/notifications/FocusZenRuleController.kt`,
+  reconciled every `BlockingMonitorService` tick (≤3s latency, same budget as
+  blocking-overlay enforcement) plus once at every process cold start. Overlapping
+  Orlune sessions resolve to the single most restrictive active policy
+  (`effectiveFocusNotificationState()`, unit-tested, mirrors how `blockedPackages`
+  already union across sessions). No `NotificationListenerService` — proven
+  unnecessary; this feature never reads notification content, only whether the system
+  lets one interrupt.
+- **Two real bugs, found only by testing on real hardware** (Pixel 7a, API 37; see
+  `docs/android-notification-policy.md` for full detail and exact `dumpsys`
+  evidence):
+  1. Orlune was completely absent from Settings' "Do Not Disturb access" grant list
+     until `android.permission.ACCESS_NOTIFICATION_POLICY` (a normal, auto-granted
+     permission) was added to the manifest — required purely for discoverability,
+     exactly mirroring `PACKAGE_USAGE_STATS`'s existing documented requirement for the
+     Usage Access list.
+  2. `addAutomaticZenRule` threw `IllegalArgumentException: Rule must have a valid
+     (enabled) ConditionProviderService or configurationActivity` until the rule was
+     given `configurationActivity = MainActivity` (the initial `owner`-only approach,
+     which several older tutorials describe, does not satisfy this OS version's
+     validation). Separately, `BlockingMonitorService`'s tick was self-stopping
+     (`hasWorkToEnforce() == false`) *before* ever reconciling the now-off
+     notification policy, and `OrluneApplication`'s cold-start resume check never
+     restarted the service at all once no rule/session remained — both left the Zen
+     rule stuck `STATE_TRUE` (device-wide DND stuck on) with no future tick ever able
+     to turn it off. Fixed by reconciling before the early-return/`stopSelf()`, and by
+     adding an unconditional one-shot reconciliation to `OrluneApplication.onCreate()`
+     independent of whether `BlockingMonitorService` itself has a reason to run.
+- **What Orlune can/cannot guarantee**: documented explicitly, in-UI and in
+  `docs/android-notification-policy.md` — cannot guarantee emergency calls reach the
+  user on every device (depends on Android/OEM DND behavior); outgoing emergency
+  dialing is entirely unaffected; Orlune cannot mark another app's channel/conversation
+  as DND-priority on the user's behalf, only whether previously-user-marked ones bypass.
+- **Tests**: `FocusNotificationPolicyTest.kt` (20 tests — policy selection, restrictiveness
+  ordering, `toZenSpec` mapping, overlapping-session resolution including ties and
+  package-set union scoping, malformed stored values, cancelled/interrupted sessions),
+  3 new `FocusSessionRepositoryTest` cases (notification-policy persistence, defaults,
+  normalization), 1 new `OrluneDatabaseMigrationTest` case (`MIGRATION_2_3`, v2→v3 row
+  survival). The Android-touching half (`FocusZenPolicyMapper`'s real `ZenPolicy`
+  construction, `FocusZenRuleController`'s system calls) isn't JVM-unit-testable (no
+  Robolectric) — verified entirely on-device instead; see Physical-device section
+  below.
+
+**Prior session (Feedback)**: Settings → Feedback hands off to the device's own email
+app via `ACTION_SENDTO` + a mailto URI — see `c72f7ea`'s commit and prior snapshots
+for detail; unchanged by this session.
+
+Earlier this phase (two sessions ago), five isolated changes were made, each
 built/tested/device-verified before starting the next:
 
 1. **No more raw package names anywhere in normal UI.** Home, Insights, and Limits'
@@ -86,19 +139,19 @@ Onboarding remains the largest not-yet-started piece of Phase 8.
 ## Build status — VERIFIED
 
 Ran on 2026-08-17 in this environment (`JAVA_HOME=F:\Android Stu\jbr`,
-`GRADLE_USER_HOME=F:\GradleUserHome`), after adding the Feedback feature:
+`GRADLE_USER_HOME=F:\GradleUserHome`), after adding Focus notification/quiet mode and
+both fixes described above (final run, after the fixes — not the earlier runs that
+surfaced the two bugs):
 
 - `.\gradlew.bat assembleDebug --stacktrace` → **BUILD SUCCESSFUL**
-- `.\gradlew.bat testDebugUnitTest --stacktrace` → **BUILD SUCCESSFUL**, **158/158**
+- `.\gradlew.bat testDebugUnitTest --stacktrace` → **BUILD SUCCESSFUL**, **181/181**
   unit tests pass, 0 failures, 0 errors (summed from the real per-suite XML results
-  in `app/build/test-results/testDebugUnitTest/`; 154 from before this session +
-  4 new in `FeedbackIntentTest`)
+  in `app/build/test-results/testDebugUnitTest/`; 158 from before this session + 23
+  new: 20 in `FocusNotificationPolicyTest` + 3 new `FocusSessionRepositoryTest` cases)
 - `.\gradlew.bat connectedDebugAndroidTest --stacktrace` → **BUILD SUCCESSFUL**,
-  **28/28** instrumentation tests pass, run against a real physical device (Pixel 7a,
-  Android 17 / API 37, serial `32201JEHN04765`) — unchanged from before this session;
-  Feedback's Intent-building half isn't unit- or instrumentation-tested (no
-  Robolectric in this project, and it's simple platform glue), it's verified by the
-  on-device walkthrough below instead
+  **29/29** instrumentation tests pass, run against a real physical device (Pixel 7a,
+  Android 17 / API 37, serial `32201JEHN04765`) — 28 from before this session + 1 new
+  `OrluneDatabaseMigrationTest` case (`MIGRATION_2_3`)
 
 ## Test status — VERIFIED (real counts, not claimed)
 
@@ -106,60 +159,96 @@ Ran on 2026-08-17 in this environment (`JAVA_HOME=F:\Android Stu\jbr`,
 |---|---|---|---|
 | Unit | `FocusSessionEngineTest` | 13 | pass |
 | Unit | `BlockingEngineTest` | 8 | pass |
-| Unit | `LegalMarkdownTest` | 13 | pass |
+| Unit | `LegalMarkdownTest` | 7 | pass |
 | Unit | `GoalEngineTest` | 6 | pass |
 | Unit | `LimitEngineTest` | 6 | pass |
 | Unit | `ScheduleEngineTest` | 14 | pass |
 | Unit | `SessionCalculatorTest` | 11 | pass |
 | Unit | `UsageAggregatorTest` | 4 | pass |
 | Unit | `BlockingRepositoryTest` | 22 | pass |
-| Unit | `FocusSessionRepositoryTest` | 8 | pass |
-| Unit | `DailyLimitInputTest` | 7 | pass |
+| Unit | `FocusSessionRepositoryTest` | 11 (+3 new) | pass |
+| Unit | `DailyLimitInputTest` | 13 | pass |
 | Unit | `LegalDocumentsTest` | 7 | pass |
 | Unit | `AppDisplayResolverTest` | 8 | pass |
 | Unit | `ScheduleInputTest` | 9 | pass |
-| Unit | `DurationStepperTest` | 9 | pass |
+| Unit | `DurationStepperTest` | 8 | pass |
 | Unit | `InsightsMetricsTest` | 10 | pass |
-| Unit | `FeedbackIntentTest` (new) | 4 | pass |
-| **Unit total** | | **158** | **158/158 pass** |
-| Instrumentation | `OrluneDatabaseMigrationTest` | 1 | pass (real device) |
+| Unit | `FeedbackIntentTest` | 4 | pass |
+| Unit | `FocusNotificationPolicyTest` (new) | 20 | pass |
+| **Unit total** | | **181** | **181/181 pass** |
+| Instrumentation | `OrluneDatabaseMigrationTest` | 2 (+1 new: `MIGRATION_2_3`) | pass (real device) |
 | Instrumentation | `BlockingRepositoryInstrumentedTest` | 8 | pass (real device) |
 | Instrumentation | `UsageRepositoryInstrumentedTest` | 7 | pass (real device) |
 | Instrumentation | `ThemePreferenceDaoInstrumentedTest` | 4 | pass (real device) |
 | Instrumentation | `InstalledAppListerInstrumentedTest` | 8 | pass (real device) |
-| **Instrumentation total** | | **28** | **28/28 pass** |
-| **Grand total** | | **186** | **186/186 pass** |
+| **Instrumentation total** | | **29** | **29/29 pass** |
+| **Grand total** | | **210** | **210/210 pass** |
 
 ## Physical-device status — VERIFIED (manual walkthrough, this session)
 
-Pixel 7a connected over USB, via `adb`/`uiautomator` (text-dump + screenshot
-verification of real rendered UI content, not just build success). Device left as
-found afterward.
+Pixel 7a connected over USB, via `adb`/`uiautomator` + `dumpsys notification --zen`/
+`settings get global zen_mode` (real system Zen state, not just UI text) and `logcat`
+(real exception traces, not assumed). Device left as found afterward — Notification
+Policy Access, Usage Access, and Overlay all confirmed still granted at the end;
+Orlune's Zen rule confirmed `STATE_FALSE` and device-wide `zen_mode=0` at the end.
 
-**Feedback flow (this session):**
-- Settings → scrolled down → "Feedback" / "Help improve Orlune" row confirmed present
-  between "Privacy & Legal" and "About Orlune" (uiautomator text dump).
-- Tapped Feedback with Gmail installed and enabled: opened Gmail's own compose screen
-  (`com.google.android.gm`), not a general share sheet. Screenshot-verified: **To**
-  chip resolved to `dallemahesh09@gmail.com` ("M. Dalle"), **Subject** =
-  "Orlune Feedback" exactly, **Body** prefilled exactly as specified ("Hello Orlune
-  team," / "I would like to share the following feedback:" / "[User writes here]" /
-  "Device / Android version:" / "[optional]" / "Thank you."), with the cursor left in
-  the body for the user to edit. Backed out without sending; draft discarded, Orlune
-  regained foreground cleanly, no crash.
-- Fallback path: `adb shell pm disable-user --user 0 com.google.android.gm`
-  (temporary, reversed immediately after with `pm enable`), relaunched Orlune, tapped
-  Feedback again — the app showed its own `AlertDialog`, title "No email app found",
-  body "No email app is available on this device.", exactly one "OK" button; no
-  `FATAL EXCEPTION`, no `ActivityNotFoundException` crash. Gmail re-enabled and
-  confirmed no longer in the disabled-package list immediately after.
-- No `INTERNET` permission, no new manifest permission, no new `<queries>` entry —
-  confirmed via `git diff -- app/src/main/AndroidManifest.xml` showing zero changes.
+**Focus notification/quiet mode (this session)** — both bugs below were found by this
+walkthrough, not by code review, and both are fixed and re-verified in the final pass:
 
-**Prior session's walkthrough** (app picker, launcher icon, Legal Center, theme
-navigation, force-stop/relaunch persistence, the Bundle-unsafe `SaveableStateProvider`
-key crash fix) is unchanged by this session — see git history for that detail if
-needed.
+- **Permission grant flow**: selecting any policy other than "Allow all" with access
+  not yet granted showed the exact required disclosure text and an "Open notification
+  settings" button; tapping it opened `Settings$ZenAccessSettingsActivity` (confirmed
+  via `dumpsys window`). **Bug 1**: Orlune was completely absent from that screen's
+  app list (confirmed by granular full-list scroll — alphabetically skipped between
+  neighboring apps) until `ACCESS_NOTIFICATION_POLICY` was added to the manifest;
+  after that fix, Orlune appeared and the grant flow (tap app → toggle → confirmation
+  dialog → "Allow") worked normally.
+- **Policy correctness, verified via `dumpsys notification --zen`, not just UI text**:
+  - "Silence all" → `zenPolicy` read `calls=disallow repeatCallers=disallow
+    alarms=allow` (everything else disallow) — alarms confirmed always audible.
+  - "Allow calls" → `calls=allow repeatCallers=allow priorityCallsSenders=anyone` —
+    confirmed distinct from "Silence all", not a stale/leftover rule.
+  - Device-wide `zen_mode`/`mInterruptionFilter` flipped to the active/restrictive
+    values while a session was running and back to `0`/off once ended — real DND
+    state, not just an app-local flag.
+- **Bug 2** (found while testing "Start Focus"): `addAutomaticZenRule` threw
+  `IllegalArgumentException: Rule must have a valid (enabled) ConditionProviderService
+  or configurationActivity` — caught by the existing try/catch (no crash), but the
+  rule silently never activated. Fixed by passing `configurationActivity =
+  MainActivity` instead of an `owner`-only rule; re-verified: rule registers and
+  activates correctly.
+- **Bug 2b** (found while testing "Stop Focus"): after fixing rule registration, DND
+  stayed *on* after ending a session — `BlockingMonitorService`'s tick decided there
+  was no more work and called `stopSelf()` before ever reconciling the now-off
+  notification policy. Confirmed stuck at `zen_mode=1`/`STATE_TRUE` across several
+  app relaunches (a second related gap: `OrluneApplication`'s cold-start resume check
+  never restarted the service once no session/rule remained, so no future tick could
+  fix it either). Both fixed (reconcile-before-`stopSelf()`, plus an unconditional
+  cold-start reconciliation in `OrluneApplication.onCreate()`); re-verified: "Stop
+  Focus" now flips the rule to `STATE_FALSE` and `zen_mode` to `0` within one tick
+  (~4s), confirmed via `dumpsys` immediately after tapping.
+- **Permission revocation mid-flow**: revoked access via Settings (confirmation
+  dialog: "All modes created by this app will be removed"), confirmed via the app's
+  own UI that the disclosure card correctly reappeared. Started a Focus session with
+  access still revoked: no crash, app-blocking selection unaffected, Zen rule never
+  activated (`zen_mode` stayed `0`), UI correctly showed "Notifications: silenced —
+  not applied (grant notification access in Settings)". Zero `SecurityException`
+  needed — the `isGranted()` check caught it before any system call. Re-granted
+  access afterward and confirmed normal operation resumed.
+- **An unrelated real incoming phone call** occurred mid-test (call state confirmed
+  via `dumpsys telephony.registry`: `mCallState=2`/OFFHOOK, active ~15s, then
+  `mCallState=0`/idle on its own). Not triggered by this testing — no tap was directed
+  at any call-control element; the session paused interaction entirely until the call
+  state returned to idle, then resumed. Recorded here for full transparency about
+  everything that touched the device during this walkthrough.
+- No `INTERNET` permission; the only manifest change is the single normal,
+  auto-granted `ACCESS_NOTIFICATION_POLICY` line — confirmed via
+  `git diff -- app/src/main/AndroidManifest.xml`.
+
+**Prior sessions' walkthroughs** (Feedback's ACTION_SENDTO flow, app picker, launcher
+icon, Legal Center, theme navigation, force-stop/relaunch persistence, the
+Bundle-unsafe `SaveableStateProvider` key crash fix) are unchanged by this session —
+see git history for that detail if needed.
 
 ## Implemented features
 
@@ -192,13 +281,21 @@ needed.
   `docs/google-play-privacy-compliance.md`. "About Orlune" explicitly states no
   LICENSE file exists and Orlune is not (yet) open source — checked against the
   actual repository, not assumed.
-- **Feedback** (this session): `platform/feedback/FeedbackIntent.kt` — a local,
-  backend-free email handoff reachable from Settings → Feedback. See "Current phase"
-  above for the full mechanism.
+- **Feedback**: `platform/feedback/FeedbackIntent.kt` — a local, backend-free email
+  handoff reachable from Settings → Feedback.
+- **Focus notification / quiet mode** (this session): per-session notification policy
+  (Allow all / Silence all / Allow calls / Allow calls + selected apps), enforced via
+  one system-owned `AutomaticZenRule` — `core/domain/focus/FocusNotificationPolicy.kt`
+  + `platform/notifications/`. See "Current phase" above and
+  `docs/android-notification-policy.md` for the full mechanism, including two real
+  bugs found and fixed by on-device testing.
 - Privacy architecture: no `INTERNET` permission anywhere, no analytics/ads/AI
-  dependency — re-verified this session via `git diff -- app/src/main/AndroidManifest.xml`
-  showing zero changes (the Feedback feature needed no manifest change at all); no
-  changes to `app/build.gradle.kts` or `gradle/libs.versions.toml`.
+  dependency — re-verified this session via `git diff -- app/src/main/AndroidManifest.xml`,
+  which shows exactly one addition: `android.permission.ACCESS_NOTIFICATION_POLICY`
+  (a normal, auto-granted permission required purely for discoverability in Settings'
+  "Do Not Disturb access" list — grants nothing on its own; see
+  `docs/android-notification-policy.md`); no changes to `app/build.gradle.kts` or
+  `gradle/libs.versions.toml`.
 
 ## Unfinished / not started
 
@@ -209,7 +306,10 @@ see `docs/legal-compliance-matrix.md`'s "Legal review required" column for exact
 what's outstanding before any public claim of compliance. No privacy-policy URL is
 hosted anywhere yet, which blocks Google Play submission independent of the document
 content itself. Analytics/recommendation algorithms, AccessibilityService, and
-website/VPN blocking remain deliberately deferred.
+website/VPN blocking remain deliberately deferred. Focus notification/quiet mode's
+API-29 (legacy `INTERRUPTION_FILTER_*`) fallback path is unverified on real API 29
+hardware — this project's only test device is API 37 (see
+`docs/android-notification-policy.md`).
 
 ## Known risks (not yet fixed — deliberately left for a future task)
 
@@ -233,22 +333,35 @@ this session:
 - The `sessions` table has no pruning implemented despite its own KDoc describing
   "short retention by design" — every closed session is kept indefinitely in
   practice (confirmed by code inspection: `SessionDao.delete` exists but is never
-  called). This session's new `observeLongestSessionBetween` query relies on that
-  actual (not documented) retention behavior. Not a regression introduced this
-  session, but worth flagging: either the KDoc or the retention behavior should
-  eventually be corrected to match the other.
+  called). The `observeLongestSessionBetween` query relies on that actual (not
+  documented) retention behavior. Not a regression, but worth flagging: either the
+  KDoc or the retention behavior should eventually be corrected to match the other.
+  Deliberately not touched this session either, per explicit instruction.
+- Focus notification/quiet mode's API-29 legacy fallback path
+  (`FocusZenPolicyMapper.toLegacyInterruptionFilter`) and the `allowPriorityChannels`
+  API-31 guard are both unverified on real hardware below API 37 — see
+  `docs/android-notification-policy.md` for exactly what's unverified and why.
+- OEM variance in how third-party `AutomaticZenRule`s are surfaced/handled is
+  reported by community sources for some heavily-skinned builds — not independently
+  verified or falsified on this project's single test device (same caution already
+  applied to OEM background-kill risk elsewhere in this file).
 
 ## Next recommended task
 
 Pick one, don't start more than one without checking in:
 
-1. **Notification-policy / Focus quiet-mode implementation** — explicitly deferred
-   from this session at the user's request, to be picked up as its own isolated task.
-2. Onboarding flow — the largest remaining piece of Phase 8, and the natural place to
+1. Onboarding flow — the largest remaining piece of Phase 8, and the natural place to
    introduce the permission requests and app picker for the first time.
-3. Legal review of the Privacy Policy / Terms of Service against
+2. Legal review of the Privacy Policy / Terms of Service against
    `docs/legal-compliance-matrix.md`'s open issues, plus resolving the actual business
    details (legal entity, address, contact) currently held as placeholders.
+3. If a second Android test device becomes available (ideally API 29–31), verify
+   Focus notification/quiet mode's legacy fallback path and the `allowPriorityChannels`
+   API guard — both currently unverified on real hardware below API 37.
+
+Do not start Focus notification/quiet-mode work again without reviewing
+`docs/android-notification-policy.md` first — it's now implemented, tested, and
+device-verified this session, not still pending.
 
 Do not start any without user sign-off. This session's changes exist only as
 uncommitted working-tree changes — not committed, not pushed; see the session's own

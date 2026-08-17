@@ -43,6 +43,7 @@ import com.orlune.app.platform.blocking.BlockingMonitorService
 import com.orlune.app.platform.blocking.NotificationPermission
 import com.orlune.app.platform.blocking.OverlayPermission
 import com.orlune.app.platform.feedback.FeedbackIntent
+import com.orlune.app.platform.notifications.NotificationPolicyAccessPermission
 import com.orlune.app.platform.usage.UsageAccessPermission
 import com.orlune.app.ui.navigation.OrluneTab
 import kotlinx.coroutines.launch
@@ -99,6 +100,7 @@ fun OrluneRoot(app: OrluneApplication) {
     var usageAccessGranted by remember { mutableStateOf(UsageAccessPermission.isGranted(context)) }
     var overlayGranted by remember { mutableStateOf(OverlayPermission.isGranted(context)) }
     var notificationGranted by remember { mutableStateOf(NotificationPermission.isGranted(context)) }
+    var notificationPolicyAccessGranted by remember { mutableStateOf(NotificationPolicyAccessPermission.isGranted(context)) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -107,6 +109,7 @@ fun OrluneRoot(app: OrluneApplication) {
                 usageAccessGranted = UsageAccessPermission.isGranted(context)
                 overlayGranted = OverlayPermission.isGranted(context)
                 notificationGranted = NotificationPermission.isGranted(context)
+                notificationPolicyAccessGranted = NotificationPolicyAccessPermission.isGranted(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -150,10 +153,17 @@ fun OrluneRoot(app: OrluneApplication) {
                     sessions = focusSessions,
                     usageAccessGranted = usageAccessGranted,
                     overlayGranted = overlayGranted,
+                    notificationPolicyAccessGranted = notificationPolicyAccessGranted,
                     onOpenOverlay = { context.startActivity(OverlayPermission.settingsIntent(context)) },
-                    onStart = { minutes, packages ->
+                    onOpenNotificationPolicySettings = { context.startActivity(NotificationPolicyAccessPermission.settingsIntent()) },
+                    onStart = { minutes, packages, notificationPolicy, allowedNotificationPackages ->
                         scope.launch {
-                            app.focusSessionRepository.startSession(minutes, packages)
+                            app.focusSessionRepository.startSession(
+                                plannedMinutes = minutes,
+                                blockedPackages = packages,
+                                notificationPolicy = notificationPolicy,
+                                allowedNotificationPackages = allowedNotificationPackages
+                            )
                             BlockingMonitorService.start(context)
                         }
                     },

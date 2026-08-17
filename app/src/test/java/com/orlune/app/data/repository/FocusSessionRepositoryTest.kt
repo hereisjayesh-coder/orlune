@@ -1,7 +1,9 @@
 package com.orlune.app.data.repository
 
+import com.orlune.app.core.domain.focus.FocusNotificationPolicy
 import com.orlune.app.core.domain.focus.FocusSessionState
 import com.orlune.app.core.domain.focus.FocusSessionEngine
+import com.orlune.app.core.domain.focus.allowedNotificationPackages
 import com.orlune.app.data.local.dao.FocusSessionDao
 import com.orlune.app.data.local.entity.FocusSessionEntity
 import kotlinx.coroutines.flow.Flow
@@ -147,5 +149,46 @@ class FocusSessionRepositoryTest {
             fail("Expected non-positive duration to be rejected")
         } catch (_: IllegalArgumentException) {
         }
+    }
+
+    @Test
+    fun `startSession defaults to ALLOW_ALL with no allowed packages when not specified`() = runTest {
+        val dao = FakeFocusSessionDao()
+        val repository = FocusSessionRepository(dao, nowMillis = { 0L })
+
+        val id = repository.startSession(plannedMinutes = 25, blockedPackages = listOf("app.a"))
+
+        val stored = dao.sessions.getValue(id)
+        assertEquals(FocusNotificationPolicy.ALLOW_ALL, FocusNotificationPolicy.fromStored(stored.notificationPolicy))
+        assertEquals(emptySet<String>(), stored.allowedNotificationPackages())
+    }
+
+    @Test
+    fun `startSession persists the chosen notification policy and normalized allowed packages`() = runTest {
+        val dao = FakeFocusSessionDao()
+        val repository = FocusSessionRepository(dao, nowMillis = { 0L })
+
+        val id = repository.startSession(
+            plannedMinutes = 25,
+            blockedPackages = listOf("app.a"),
+            notificationPolicy = FocusNotificationPolicy.ALLOW_CALLS_AND_SELECTED,
+            allowedNotificationPackages = listOf(" app.chat ", "app.chat", "", "app.mail")
+        )
+
+        val stored = dao.sessions.getValue(id)
+        assertEquals(FocusNotificationPolicy.ALLOW_CALLS_AND_SELECTED, FocusNotificationPolicy.fromStored(stored.notificationPolicy))
+        assertEquals(setOf("app.chat", "app.mail"), stored.allowedNotificationPackages())
+    }
+
+    @Test
+    fun `startSession accepts SILENCE_ALL and ALLOW_CALLS with an empty allowed-package list`() = runTest {
+        val dao = FakeFocusSessionDao()
+        val repository = FocusSessionRepository(dao, nowMillis = { 0L })
+
+        val silenceId = repository.startSession(plannedMinutes = 25, blockedPackages = listOf("app.a"), notificationPolicy = FocusNotificationPolicy.SILENCE_ALL)
+        val callsId = repository.startSession(plannedMinutes = 25, blockedPackages = listOf("app.a"), notificationPolicy = FocusNotificationPolicy.ALLOW_CALLS)
+
+        assertEquals(FocusNotificationPolicy.SILENCE_ALL, FocusNotificationPolicy.fromStored(dao.sessions.getValue(silenceId).notificationPolicy))
+        assertEquals(FocusNotificationPolicy.ALLOW_CALLS, FocusNotificationPolicy.fromStored(dao.sessions.getValue(callsId).notificationPolicy))
     }
 }

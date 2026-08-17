@@ -8,6 +8,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.orlune.app.core.domain.focus.FocusSessionEngine
 import com.orlune.app.core.domain.focus.FocusSessionState
+import com.orlune.app.core.domain.focus.effectiveFocusNotificationState
 import com.orlune.app.data.local.OrluneDatabase
 import com.orlune.app.data.local.OrluneMigrations
 import com.orlune.app.data.repository.BlockingRepository
@@ -15,6 +16,7 @@ import com.orlune.app.data.repository.FocusSessionRepository
 import com.orlune.app.data.repository.UsageRepository
 import com.orlune.app.platform.blocking.BlockingMonitorService
 import com.orlune.app.platform.blocking.OverlayPermission
+import com.orlune.app.platform.notifications.FocusZenRuleController
 import com.orlune.app.platform.usage.AppLabelResolver
 import com.orlune.app.platform.usage.InstalledAppLister
 import com.orlune.app.platform.usage.UsageAccessPermission
@@ -33,7 +35,7 @@ class OrluneApplication : Application(), Configuration.Provider {
         // Version 1 -> 2 uses an explicit preserving migration (see OrluneMigrations.kt);
         // unsupported upgrades must fail rather than silently deleting local user data.
         Room.databaseBuilder(this, OrluneDatabase::class.java, OrluneDatabase.DATABASE_NAME)
-            .addMigrations(OrluneMigrations.MIGRATION_1_2)
+            .addMigrations(OrluneMigrations.MIGRATION_1_2, OrluneMigrations.MIGRATION_2_3)
             .build()
     }
 
@@ -75,6 +77,7 @@ class OrluneApplication : Application(), Configuration.Provider {
         super.onCreate()
         schedulePeriodicUsageAggregation()
         resumeMonitoringIfNeeded()
+        reconcileFocusNotificationPolicyOnColdStart()
     }
 
     /**
@@ -97,6 +100,28 @@ class OrluneApplication : Application(), Configuration.Provider {
             if (hasRules || hasFocusSession) {
                 BlockingMonitorService.start(this@OrluneApplication)
             }
+        }
+    }
+
+    /**
+     * A stray Orlune Zen rule left `STATE_TRUE` cannot rely on
+     * [BlockingMonitorService]'s tick loop alone to ever turn it back off: that loop
+     * only keeps running while [resumeMonitoringIfNeeded] finds live work (a rule or
+     * an ACTIVE/SCHEDULED session) — a session that already finished (or that a killed
+     * process's [reconcileActiveSessions] never got to finalize) leaves nothing to
+     * restart the service for, so the rule would stay silently active forever with no
+     * later tick ever reaching the code that turns it off. This runs unconditionally,
+     * independent of Usage Access/Overlay (notification policy has nothing to do with
+     * either), so a device reboot or a process kill mid-session always gets a chance
+     * to restore normal notification behavior the next time Orlune's process starts —
+     * even if that's just from the user reopening the app, not a background restart.
+     */
+    private fun reconcileFocusNotificationPolicyOnColdStart() {
+        CoroutineScope(Dispatchers.Default).launch {
+            focusSessionRepository.reconcileActiveSessions()
+            val sessions = database.focusSessionDao().observeAll().first()
+            val effective = effectiveFocusNotificationState(sessions, System.currentTimeMillis())
+            FocusZenRuleController.reconcile(this@OrluneApplication, effective?.policy)
         }
     }
 
