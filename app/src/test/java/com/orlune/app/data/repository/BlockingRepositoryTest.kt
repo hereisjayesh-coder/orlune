@@ -69,6 +69,7 @@ class BlockingRepositoryTest {
         override fun observeForDayWithLabels(epochDay: Long): Flow<List<AppDailyUsage>> = flowOf(emptyList())
         override fun observeTotalSecondsBetween(startEpochDay: Long, endEpochDay: Long): Flow<Long> = flowOf(0L)
         override fun observeAppTotalsBetween(startEpochDay: Long, endEpochDay: Long): Flow<List<AppPeriodUsage>> = flowOf(emptyList())
+        override fun observeCount(): Flow<Int> = flowOf(0)
     }
 
     private class FakeSessionDao(private val openSessions: List<SessionEntity>) : SessionDao {
@@ -79,6 +80,7 @@ class BlockingRepositoryTest {
         override suspend fun getOpenSessions(): List<SessionEntity> = openSessions
         override suspend fun getClosedSessionsForDay(packageName: String, dayStartTs: Long, dayEndTs: Long): List<SessionEntity> =
             emptyList()
+        override fun observeCount(): Flow<Int> = flowOf(openSessions.size)
     }
 
     private class FakeFocusSessionDao(private val sessions: List<FocusSessionEntity>) : FocusSessionDao {

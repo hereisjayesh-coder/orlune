@@ -43,8 +43,8 @@ fun HomeScreen(
     LazyColumn(modifier = modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Spacer(modifier = Modifier.height(20.dp))
-            Text("Orlune", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Text("Your time, seen clearly.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Orlune", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("Your time, seen clearly.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (!usageAccessGranted) {
             item {
@@ -54,10 +54,11 @@ fun HomeScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Today", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(formatDuration(totalToday), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
-                    Text("tracked on this device", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Today", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(formatDuration(totalToday), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
+                    Text("tracked on this device", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = onRefresh) { Text("Refresh") }
                         Button(onClick = onFocus) { Text("Start focus") }
@@ -71,7 +72,7 @@ fun HomeScreen(
                 MetricCard("Focus", if (activeFocus == null) "Ready" else "Active", Modifier.weight(1f))
             }
         }
-        item { Text("Most used today", style = MaterialTheme.typography.titleLarge) }
+        item { Text("Most used today", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
         if (todayUsage.isEmpty()) {
             item { EmptyState("No usage recorded yet today.", "Refresh after using an app.") }
         } else {

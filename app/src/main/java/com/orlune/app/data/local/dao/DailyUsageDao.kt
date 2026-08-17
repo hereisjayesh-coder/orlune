@@ -72,4 +72,8 @@ interface DailyUsageDao {
         """
     )
     fun observeAppTotalsBetween(startEpochDay: Long, endEpochDay: Long): Flow<List<AppPeriodUsage>>
+
+    /** Total stored daily-usage row count, for the Privacy Center's "data stored" summary. */
+    @Query("SELECT COUNT(*) FROM daily_usage")
+    fun observeCount(): Flow<Int>
 }

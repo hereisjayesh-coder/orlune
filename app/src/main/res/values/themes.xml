@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Placeholder manifest theme; real Light/Dark/Forest theming is Compose-driven (Phase 8). -->
-    <style name="Theme.Orlune" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Manifest-level theme: only governs the instant before setContent{} composes
+         and system-chrome defaults. Deliberately always black (not day/night-aware) —
+         Orlune is black-first by brand, so the pre-Compose flash should read as
+         Orlune's black, not the framework's default white. Real System/Light/Dark
+         theming is entirely Compose-driven via OrluneTheme (see ui/theme/Theme.kt). -->
+    <style name="Theme.Orlune" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ic_launcher_background</item>
+    </style>
 </resources>

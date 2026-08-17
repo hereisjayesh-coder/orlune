@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -37,7 +40,8 @@ fun SettingsScreen(
     onOpenUsageAccess: () -> Unit,
     onOpenOverlay: () -> Unit,
     onExport: () -> Unit,
-    onDeleteRequest: () -> Unit
+    onDeleteRequest: () -> Unit,
+    onOpenPrivacyCenter: () -> Unit
 ) {
     val context = LocalContext.current
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -70,6 +74,16 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(onClick = onExport, modifier = Modifier.fillMaxWidth()) { Text("Export local data") }
                 OutlinedButton(onClick = onDeleteRequest, modifier = Modifier.fillMaxWidth()) { Text("Delete all local data") }
+            }
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenPrivacyCenter).padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Privacy & Legal", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         item {

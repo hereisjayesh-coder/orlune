@@ -37,7 +37,7 @@ import com.orlune.app.feature.focus.FocusScreen
 import com.orlune.app.feature.home.HomeScreen
 import com.orlune.app.feature.insights.InsightsScreen
 import com.orlune.app.feature.limits.LimitsScreen
-import com.orlune.app.feature.settings.SettingsScreen
+import com.orlune.app.feature.settings.SettingsSection
 import com.orlune.app.platform.blocking.BlockingMonitorService
 import com.orlune.app.platform.blocking.NotificationPermission
 import com.orlune.app.platform.blocking.OverlayPermission
@@ -52,6 +52,7 @@ fun OrluneRoot(app: OrluneApplication) {
     val scope = rememberCoroutineScope()
     var selectedTab by rememberSaveable { mutableStateOf(OrluneTab.HOME.name) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showResetDialog by remember { mutableStateOf(false) }
     var exportError by remember { mutableStateOf(false) }
     val tab = OrluneTab.valueOf(selectedTab)
 
@@ -73,6 +74,8 @@ fun OrluneRoot(app: OrluneApplication) {
     val apps by app.database.appDao().observeAll().collectAsState(initial = emptyList())
     val focusSessions by app.focusSessionRepository.observeAll().collectAsState(initial = emptyList())
     val themePreference by app.database.themePreferenceDao().observe().collectAsState(initial = null)
+    val sessionCount by app.database.sessionDao().observeCount().collectAsState(initial = 0)
+    val dailyUsageCount by app.database.dailyUsageDao().observeCount().collectAsState(initial = 0)
 
     var usageAccessGranted by remember { mutableStateOf(UsageAccessPermission.isGranted(context)) }
     var overlayGranted by remember { mutableStateOf(OverlayPermission.isGranted(context)) }
@@ -160,7 +163,7 @@ fun OrluneRoot(app: OrluneApplication) {
                     previousWeekTotal = previousWeekTotal,
                     apps = comparisonApps
                 )
-                OrluneTab.SETTINGS -> SettingsScreen(
+                OrluneTab.SETTINGS -> SettingsSection(
                     modifier = Modifier.padding(padding),
                     themeMode = themePreference?.themeId ?: "system",
                     usageAccessGranted = usageAccessGranted,
@@ -177,7 +180,13 @@ fun OrluneRoot(app: OrluneApplication) {
                                 .onFailure { exportError = true }
                         }
                     },
-                    onDeleteRequest = { showDeleteDialog = true }
+                    onDeleteRequest = { showDeleteDialog = true },
+                    onResetRequest = { showResetDialog = true },
+                    sessionCount = sessionCount,
+                    dailyUsageCount = dailyUsageCount,
+                    ruleCount = rules.size,
+                    focusSessionCount = focusSessions.size,
+                    knownAppCount = apps.size
                 )
             }
         }
@@ -198,6 +207,24 @@ fun OrluneRoot(app: OrluneApplication) {
                 }) { Text("Delete all") }
             },
             dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Reset Orlune?") },
+            text = { Text("This returns Orlune to its initial, freshly-installed state — usage history, rules, schedules, focus sessions, and preferences are all cleared. It cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showResetDialog = false
+                    scope.launch {
+                        BlockingMonitorService.stop(context)
+                        app.database.clearAllTables()
+                    }
+                }) { Text("Reset") }
+            },
+            dismissButton = { TextButton(onClick = { showResetDialog = false }) { Text("Cancel") } }
         )
     }
 

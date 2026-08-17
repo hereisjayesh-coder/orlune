@@ -1,5 +1,6 @@
 package com.orlune.app.feature.limits
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,9 +11,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,12 +27,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.orlune.app.core.domain.rules.DailyLimitInput
 import com.orlune.app.data.local.entity.AppEntity
 import com.orlune.app.data.local.entity.RuleEntity
 import com.orlune.app.ui.components.EmptyState
 import com.orlune.app.ui.components.FormCard
 import com.orlune.app.ui.components.formatDuration
 import com.orlune.app.ui.components.isValidSchedule
+
+private val presetMinutes = listOf(30, 45, 60, 90)
 
 @Composable
 fun LimitsScreen(
@@ -42,7 +47,11 @@ fun LimitsScreen(
     onDelete: (RuleEntity) -> Unit
 ) {
     var packageName by rememberSaveable { mutableStateOf("") }
-    var minutes by rememberSaveable { mutableStateOf("30") }
+    var selectedPresetMinutes by rememberSaveable { mutableStateOf<Int?>(30) }
+    var customSelected by rememberSaveable { mutableStateOf(false) }
+    var customHoursText by rememberSaveable { mutableStateOf("") }
+    var customMinutesText by rememberSaveable { mutableStateOf("") }
+    var limitError by rememberSaveable { mutableStateOf<String?>(null) }
     var scheduleName by rememberSaveable { mutableStateOf("") }
     var schedulePackage by rememberSaveable { mutableStateOf("") }
     var scheduleDays by rememberSaveable { mutableStateOf("MON,TUE,WED,THU,FRI") }
@@ -57,11 +66,72 @@ fun LimitsScreen(
             Text("Simple rules, under your control.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         item {
+            // Presets are shortcuts into the same (hours, minutes) -> seconds path as
+            // Custom — DailyLimitInput.toThresholdSeconds validates both identically,
+            // so a preset is never "more trusted" than a hand-typed custom duration.
+            // Presets are flat minute counts (e.g. 90), so they're decomposed into
+            // hours+minutes before validation, same as toThresholdSeconds expects.
+            val currentHours = if (customSelected) customHoursText.toIntOrNull() ?: 0 else (selectedPresetMinutes ?: 0) / 60
+            val currentMinutes = if (customSelected) customMinutesText.toIntOrNull() ?: 0 else (selectedPresetMinutes ?: 0) % 60
+            val previewSeconds = (currentHours * 3600L) + (currentMinutes * 60L)
             FormCard("Daily app limit") {
                 OutlinedTextField(value = packageName, onValueChange = { packageName = it }, label = { Text("Package name") }, supportingText = { if (knownNames.isNotEmpty()) Text("Known: ${knownNames.take(3).joinToString()}") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = minutes, onValueChange = { minutes = it.filter(Char::isDigit).take(5) }, label = { Text("Minutes") }, modifier = Modifier.fillMaxWidth())
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("30", "45", "60", "90").forEach { value -> OutlinedButton(onClick = { minutes = value }) { Text("$value m") } } }
-                Button(onClick = { val value = minutes.toLongOrNull(); if (!packageName.isBlank() && value != null && value > 0) { onAddLimit(packageName.trim(), value * 60); packageName = "" } }, modifier = Modifier.fillMaxWidth()) { Text("Add limit") }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                ) {
+                    presetMinutes.forEach { preset ->
+                        FilterChip(
+                            selected = !customSelected && selectedPresetMinutes == preset,
+                            onClick = { selectedPresetMinutes = preset; customSelected = false; limitError = null },
+                            label = { Text("${preset}m") }
+                        )
+                    }
+                    FilterChip(
+                        selected = customSelected,
+                        onClick = { customSelected = true; limitError = null },
+                        label = { Text("Custom") }
+                    )
+                }
+                if (customSelected) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = customHoursText,
+                            onValueChange = { customHoursText = it.filter(Char::isDigit).take(2); limitError = null },
+                            label = { Text("Hours") },
+                            isError = limitError != null,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = customMinutesText,
+                            onValueChange = { customMinutesText = it.filter(Char::isDigit).take(2); limitError = null },
+                            label = { Text("Minutes") },
+                            isError = limitError != null,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                Text("= ${formatDuration(previewSeconds)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (limitError != null) {
+                    Text(limitError.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+                Button(
+                    onClick = {
+                        if (packageName.isBlank()) {
+                            limitError = "Enter a package name"
+                            return@Button
+                        }
+                        DailyLimitInput.toThresholdSeconds(currentHours, currentMinutes).fold(
+                            onSuccess = { seconds ->
+                                onAddLimit(packageName.trim(), seconds)
+                                packageName = ""
+                                limitError = null
+                            },
+                            onFailure = { limitError = it.message }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Add limit") }
             }
         }
         item {

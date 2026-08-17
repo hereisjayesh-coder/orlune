@@ -27,4 +27,8 @@ interface SessionDao {
 
     @Query("SELECT * FROM sessions WHERE packageName = :packageName AND startTs >= :dayStartTs AND startTs < :dayEndTs AND endTs IS NOT NULL")
     suspend fun getClosedSessionsForDay(packageName: String, dayStartTs: Long, dayEndTs: Long): List<SessionEntity>
+
+    /** Total stored session row count, for the Privacy Center's "data stored" summary. */
+    @Query("SELECT COUNT(*) FROM sessions")
+    fun observeCount(): Flow<Int>
 }
