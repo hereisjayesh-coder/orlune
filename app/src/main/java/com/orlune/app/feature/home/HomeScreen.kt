@@ -20,13 +20,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.remember
 import com.orlune.app.data.local.dao.AppDailyUsage
 import com.orlune.app.data.local.entity.FocusSessionEntity
+import com.orlune.app.platform.usage.InstalledAppSource
+import com.orlune.app.ui.components.AppUsageRow
 import com.orlune.app.ui.components.EmptyState
 import com.orlune.app.ui.components.InfoCard
 import com.orlune.app.ui.components.MetricCard
-import com.orlune.app.ui.components.UsageLine
 import com.orlune.app.ui.components.formatDuration
+import com.orlune.app.ui.components.rememberAppDisplayInfos
 
 @Composable
 fun HomeScreen(
@@ -36,10 +39,16 @@ fun HomeScreen(
     activeRules: Int,
     activeFocus: FocusSessionEntity?,
     usageAccessGranted: Boolean,
+    installedAppSource: InstalledAppSource,
+    ownPackageName: String,
     onOpenUsageAccess: () -> Unit,
     onRefresh: () -> Unit,
     onFocus: () -> Unit
 ) {
+    val displayedUsage = remember(todayUsage, ownPackageName) {
+        todayUsage.filter { it.packageName != ownPackageName }.take(5)
+    }
+    val displayInfos = rememberAppDisplayInfos(installedAppSource, displayedUsage.map { it.packageName to it.label })
     LazyColumn(modifier = modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Spacer(modifier = Modifier.height(20.dp))
@@ -73,10 +82,13 @@ fun HomeScreen(
             }
         }
         item { Text("Most used today", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
-        if (todayUsage.isEmpty()) {
+        if (displayedUsage.isEmpty()) {
             item { EmptyState("No usage recorded yet today.", "Refresh after using an app.") }
         } else {
-            items(todayUsage.take(5), key = { it.packageName }) { UsageLine(it.label ?: it.packageName, it.totalUsageSeconds) }
+            items(displayedUsage, key = { it.packageName }) { usage ->
+                val display = displayInfos[usage.packageName]
+                if (display != null) AppUsageRow(display, usage.totalUsageSeconds)
+            }
         }
         item { Spacer(modifier = Modifier.height(20.dp)) }
     }

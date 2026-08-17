@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -35,10 +36,17 @@ import androidx.compose.ui.unit.dp
 import com.orlune.app.core.domain.rules.DailyLimitInput
 import com.orlune.app.data.local.entity.AppEntity
 import com.orlune.app.data.local.entity.RuleEntity
+import com.orlune.app.platform.usage.InstalledAppSource
+import com.orlune.app.ui.components.AppIcon
+import com.orlune.app.ui.components.DurationStepper
 import com.orlune.app.ui.components.EmptyState
 import com.orlune.app.ui.components.FormCard
+import com.orlune.app.ui.components.TimePickerField
+import com.orlune.app.ui.components.WEEKDAY_ORDER
+import com.orlune.app.ui.components.WeekdaySelector
 import com.orlune.app.ui.components.formatDuration
 import com.orlune.app.ui.components.isValidSchedule
+import com.orlune.app.ui.components.rememberAppDisplayInfos
 
 private val presetMinutes = listOf(30, 45, 60, 90)
 
@@ -47,6 +55,7 @@ fun LimitsScreen(
     modifier: Modifier,
     apps: List<AppEntity>,
     rules: List<RuleEntity>,
+    installedAppSource: InstalledAppSource,
     limitAppLabel: String?,
     onPickLimitApp: () -> Unit,
     scheduleAppLabel: String?,
@@ -57,8 +66,8 @@ fun LimitsScreen(
 ) {
     var selectedPresetMinutes by rememberSaveable { mutableStateOf<Int?>(30) }
     var customSelected by rememberSaveable { mutableStateOf(false) }
-    var customHoursText by rememberSaveable { mutableStateOf("") }
-    var customMinutesText by rememberSaveable { mutableStateOf("") }
+    var customHours by rememberSaveable { mutableStateOf(0) }
+    var customMinutes by rememberSaveable { mutableStateOf(0) }
     var limitError by rememberSaveable { mutableStateOf<String?>(null) }
     var scheduleName by rememberSaveable { mutableStateOf("") }
     var scheduleDays by rememberSaveable { mutableStateOf("MON,TUE,WED,THU,FRI") }
@@ -66,6 +75,10 @@ fun LimitsScreen(
     var scheduleEnd by rememberSaveable { mutableStateOf("07:00") }
     val scheduleValid = isValidSchedule(scheduleDays, scheduleStart, scheduleEnd)
     val labelsByPackage = remember(apps) { apps.associate { it.packageName to it.label } }
+    val ruleDisplayInfos = rememberAppDisplayInfos(
+        installedAppSource,
+        rules.map { it.targetPackageOrCategory to labelsByPackage[it.targetPackageOrCategory] }
+    )
 
     LazyColumn(modifier = modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
@@ -79,8 +92,8 @@ fun LimitsScreen(
             // so a preset is never "more trusted" than a hand-typed custom duration.
             // Presets are flat minute counts (e.g. 90), so they're decomposed into
             // hours+minutes before validation, same as toThresholdSeconds expects.
-            val currentHours = if (customSelected) customHoursText.toIntOrNull() ?: 0 else (selectedPresetMinutes ?: 0) / 60
-            val currentMinutes = if (customSelected) customMinutesText.toIntOrNull() ?: 0 else (selectedPresetMinutes ?: 0) % 60
+            val currentHours = if (customSelected) customHours else (selectedPresetMinutes ?: 0) / 60
+            val currentMinutes = if (customSelected) customMinutes else (selectedPresetMinutes ?: 0) % 60
             val previewSeconds = (currentHours * 3600L) + (currentMinutes * 60L)
             FormCard("Daily app limit") {
                 AppPickerField(label = limitAppLabel, onClick = onPickLimitApp)
@@ -102,22 +115,13 @@ fun LimitsScreen(
                     )
                 }
                 if (customSelected) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = customHoursText,
-                            onValueChange = { customHoursText = it.filter(Char::isDigit).take(2); limitError = null },
-                            label = { Text("Hours") },
-                            isError = limitError != null,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = customMinutesText,
-                            onValueChange = { customMinutesText = it.filter(Char::isDigit).take(2); limitError = null },
-                            label = { Text("Minutes") },
-                            isError = limitError != null,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                    DurationStepper(
+                        hours = customHours,
+                        minutes = customMinutes,
+                        onHoursChange = { customHours = it; limitError = null },
+                        onMinutesChange = { customMinutes = it; limitError = null },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
                 Text("= ${formatDuration(previewSeconds)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (limitError != null) {
@@ -145,10 +149,15 @@ fun LimitsScreen(
             FormCard("Recurring schedule") {
                 OutlinedTextField(value = scheduleName, onValueChange = { scheduleName = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
                 AppPickerField(label = scheduleAppLabel, onClick = onPickScheduleApp)
-                OutlinedTextField(value = scheduleDays, onValueChange = { scheduleDays = it }, label = { Text("Days, e.g. MON,WED") }, modifier = Modifier.fillMaxWidth())
+                Text("Days", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val selectedDays = remember(scheduleDays) { scheduleDays.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet() }
+                WeekdaySelector(
+                    selectedDays = selectedDays,
+                    onDaysChange = { days -> scheduleDays = WEEKDAY_ORDER.filter { it in days }.joinToString(",") }
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = scheduleStart, onValueChange = { scheduleStart = it }, label = { Text("Start") }, modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = scheduleEnd, onValueChange = { scheduleEnd = it }, label = { Text("End") }, modifier = Modifier.weight(1f))
+                    TimePickerField("Start", scheduleStart, { scheduleStart = it }, modifier = Modifier.weight(1f))
+                    TimePickerField("End", scheduleEnd, { scheduleEnd = it }, modifier = Modifier.weight(1f))
                 }
                 val scheduleReady = scheduleName.isNotBlank() && scheduleAppLabel != null && scheduleValid
                 Button(
@@ -167,9 +176,13 @@ fun LimitsScreen(
         if (rules.isEmpty()) item { EmptyState("No rules yet.", "Add a limit or schedule above.") }
         items(rules, key = { it.id }) { rule ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(labelsByPackage[rule.targetPackageOrCategory] ?: rule.targetPackageOrCategory, fontWeight = FontWeight.Medium)
-                    Text(if (rule.type == "limit") "Daily limit · ${formatDuration(rule.threshold ?: 0)}" else "Scheduled restriction", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    AppIcon(ruleDisplayInfos[rule.targetPackageOrCategory]?.icon)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(ruleDisplayInfos[rule.targetPackageOrCategory]?.label ?: "Unknown app", fontWeight = FontWeight.Medium)
+                        Text(if (rule.type == "limit") "Daily limit · ${formatDuration(rule.threshold ?: 0)}" else "Scheduled restriction", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 TextButton(onClick = { onDelete(rule) }) { Text("Remove") }
             }

@@ -58,6 +58,7 @@ fun LimitsSection(
                 modifier = modifier,
                 apps = apps,
                 rules = rules,
+                installedAppSource = installedAppSource,
                 limitAppLabel = limitLabel,
                 onPickLimitApp = { backStack.add(LimitsDestination.PickAppForLimit) },
                 scheduleAppLabel = scheduleLabel,

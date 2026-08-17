@@ -60,4 +60,36 @@ class InstalledAppListerInstrumentedTest {
         val apps = lister.listLaunchableApps(excludePackage = null)
         assertEquals(apps.size, apps.map { it.packageName }.distinct().size)
     }
+
+    @Test
+    fun resolveDisplayInfo_resolvesOrlunesOwnPackage() {
+        // Orlune's own package is always installed on the test device running this
+        // test, so it must resolve to a non-blank label via the same code path
+        // listLaunchableApps uses internally.
+        val result = lister.resolveDisplayInfo(context.packageName)
+        assertTrue(result != null && result.label.isNotBlank())
+    }
+
+    @Test
+    fun resolveDisplayInfo_returnsNullForAnObviouslyNonexistentPackage() {
+        val result = lister.resolveDisplayInfo("com.orlune.app.this.package.does.not.exist.test.only")
+        assertEquals(null, result)
+    }
+
+    @Test
+    fun defaultHomePackageName_resolvesToARealLaunchableApp() {
+        // Every real device/emulator this suite runs on has a default launcher set,
+        // so this must resolve to some package — and per Android's package-visibility
+        // model, that package must also be discoverable as launchable (this is
+        // exactly the manifest <queries> CATEGORY_HOME entry this test exists to
+        // guard: without it, this call returns null even though a default launcher
+        // is set on the device).
+        val homePackage = lister.defaultHomePackageName()
+        assertTrue("expected a resolvable default launcher package on the test device", homePackage != null)
+        val allApps = lister.listLaunchableApps(excludePackage = null)
+        assertTrue(
+            "the default launcher package should itself be resolvable via PackageManager",
+            lister.resolveDisplayInfo(homePackage!!) != null || allApps.any { it.packageName == homePackage }
+        )
+    }
 }

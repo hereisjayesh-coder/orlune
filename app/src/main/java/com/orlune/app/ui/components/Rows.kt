@@ -17,11 +17,6 @@ import com.orlune.app.core.domain.focus.FocusSessionEngine
 import com.orlune.app.data.local.entity.FocusSessionEntity
 
 @Composable
-fun UsageLine(label: String, seconds: Long) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, modifier = Modifier.weight(1f)); Text(formatDuration(seconds), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-}
-
-@Composable
 fun SessionLine(session: FocusSessionEntity) {
     val state = FocusSessionEngine.stateOf(session, System.currentTimeMillis())
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {

@@ -81,6 +81,7 @@ class BlockingRepositoryTest {
         override suspend fun getClosedSessionsForDay(packageName: String, dayStartTs: Long, dayEndTs: Long): List<SessionEntity> =
             emptyList()
         override fun observeCount(): Flow<Int> = flowOf(openSessions.size)
+        override fun observeLongestSessionBetween(startTs: Long, endTs: Long): Flow<SessionEntity?> = flowOf(null)
     }
 
     private class FakeFocusSessionDao(private val sessions: List<FocusSessionEntity>) : FocusSessionDao {

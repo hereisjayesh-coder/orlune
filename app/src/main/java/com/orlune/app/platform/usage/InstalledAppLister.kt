@@ -30,16 +30,35 @@ class InstalledAppLister(private val context: Context) : InstalledAppSource {
             .map { it.activityInfo.packageName }
             .distinct()
             .filter { it != excludePackage }
-            .mapNotNull { packageName ->
-                runCatching {
-                    val appInfo = packageManager.getApplicationInfo(packageName, 0)
-                    InstalledApp(
-                        packageName = packageName,
-                        label = packageManager.getApplicationLabel(appInfo).toString(),
-                        icon = runCatching { packageManager.getApplicationIcon(packageName).toBitmap() }.getOrNull()
-                    )
-                }.getOrNull()
-            }
+            .mapNotNull { packageName -> resolveApp(packageName) }
             .sortedBy { it.label.lowercase() }
+    }
+
+    override fun resolveDisplayInfo(packageName: String): InstalledApp? = resolveApp(packageName)
+
+    override fun defaultHomePackageName(): String? {
+        val packageManager = context.packageManager
+        val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val resolveInfo = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.resolveActivity(homeIntent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            }
+        }.getOrNull()
+        return resolveInfo?.activityInfo?.packageName
+    }
+
+    private fun resolveApp(packageName: String): InstalledApp? {
+        val packageManager = context.packageManager
+        return runCatching {
+            val appInfo = packageManager.getApplicationInfo(packageName, 0)
+            InstalledApp(
+                packageName = packageName,
+                label = packageManager.getApplicationLabel(appInfo).toString(),
+                icon = runCatching { packageManager.getApplicationIcon(packageName).toBitmap() }.getOrNull()
+            )
+        }.getOrNull()
     }
 }

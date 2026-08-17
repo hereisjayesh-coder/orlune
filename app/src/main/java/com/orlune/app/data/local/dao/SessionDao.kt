@@ -31,4 +31,16 @@ interface SessionDao {
     /** Total stored session row count, for the Privacy Center's "data stored" summary. */
     @Query("SELECT COUNT(*) FROM sessions")
     fun observeCount(): Flow<Int>
+
+    /** The single longest closed session started within [startTs, endTs) — Insights'
+     * "longest usage session" fact. Null when no closed session exists in the window. */
+    @Query(
+        """
+        SELECT * FROM sessions
+        WHERE endTs IS NOT NULL AND startTs >= :startTs AND startTs < :endTs
+        ORDER BY (endTs - startTs) DESC
+        LIMIT 1
+        """
+    )
+    fun observeLongestSessionBetween(startTs: Long, endTs: Long): Flow<SessionEntity?>
 }

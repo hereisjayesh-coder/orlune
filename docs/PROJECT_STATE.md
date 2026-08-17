@@ -1,12 +1,15 @@
 # Orlune — Project State
 
-**Last verification date:** 2026-08-17 (app picker replacing raw package-name input;
-launcher icon implemented from the approved reference; Privacy & Legal Center
-expanded to full requested structure with new compliance docs)
+**Last verification date:** 2026-08-17 (raw package names eliminated from all normal
+UI via a live label/icon presentation layer; recurring-schedule day/time entry
+replaced with a day selector and Material time-picker; daily-limit custom duration
+replaced with a tap stepper; Insights extended with longest session / focus stats /
+limit compliance — all derived from existing local data, no AI, no fabricated stats)
 
-**Latest verified commit:** working tree as of this file's date, on top of `8451fcb`
-("feat: implement approved launcher icon from Logo.PNG reference, polish Privacy &
-Legal Center") — verify with `git log`/`git status` before trusting this file's
+**Latest verified commit:** working tree as of this file's date, on top of `58b998f`
+("feat: add initial Orlune product shell") — this session's changes are **not yet
+committed** (uncommitted working-tree changes only, not pushed) pending explicit
+instruction to commit; verify with `git log`/`git status` before trusting this file's
 claims if picking this up later; this file is a snapshot, not a substitute for
 checking the real repository state.
 
@@ -19,32 +22,59 @@ significant change; keep `AGENTS.MD` stable unless a rule itself changes.
 
 ## Current phase
 
-**Phase 6 is implemented and tested. Phase 8 (UI) and Phase 9 (Privacy Center) both
-advanced significantly this session** — see `ROADMAP.md` for the phase table. The
-biggest UI change since the last snapshot: Limits and Focus no longer accept raw
-package-name text/CSV input anywhere — both use a native app picker
-(`feature/apppicker/AppPickerScreen.kt`) with real app icons, real names, search, and
-"Frequently used today" (from real Insights usage data). The Privacy & Legal Center
-(Settings → Privacy & Legal) now has all 15 requested documents, with the Privacy
-Policy and Terms of Service expanded to their full 23- and 28-section structure,
-informed by this session's research into India's DPDP Act 2023/Rules 2025, GDPR/UK
-GDPR, CCPA/CPRA, and COPPA (see `docs/legal-compliance-matrix.md`) and current Google
-Play policy (see `docs/google-play-privacy-compliance.md`). The launcher icon is now
-implemented from the user-approved reference image (`design/orlune-logo-reference.png`),
-not the earlier placeholder clock mark. Onboarding remains the largest not-yet-started
-piece of Phase 8.
+**Phase 6 remains implemented and tested. Phase 8 (UI) advanced significantly this
+session**, focused entirely on eliminating raw package-name exposure and manual
+text-entry from normal UI — see `ROADMAP.md` for the phase table. Five isolated
+changes, each built/tested/device-verified before starting the next:
+
+1. **No more raw package names anywhere in normal UI.** Home, Insights, and Limits'
+   "Active rules" now resolve every package to a live label + icon via a new
+   presentation layer (`platform/usage/AppDisplayResolver.kt`), rather than trusting
+   the `apps` table's possibly-stale stored label. The device's current default
+   launcher (previously shown as `com.google.android.apps.nexuslauncher`) now reads
+   "Home screen" — fixed at the root cause: the `<queries>` manifest block only
+   declared `CATEGORY_LAUNCHER`, not `CATEGORY_HOME`, so the launcher's own package
+   was never visible to `PackageManager`. Orlune's own package is excluded from Home
+   and Insights usage lists (UI-layer filtering only — no `SessionEntity`/
+   `DailyUsageEntity` rows or repository/DAO behavior changed; underlying usage data
+   is untouched, matching the "presentation, not deletion" rule).
+2. **Recurring schedule input**: the "MON,TUE,WED,THU,FRI" free-text field and two
+   raw HH:mm text fields are gone, replaced by `ui/components/WeekdaySelector.kt`
+   (individual Mon–Sun toggles + Every day/Weekdays/Weekends/Custom presets) and
+   `ui/components/TimePickerField.kt` (a Material3 `TimePicker` dialog). Both still
+   produce exactly the same wire format `ScheduleEntity`/`ScheduleEngine` already
+   expect (comma-separated day codes, "HH:mm" strings) — the domain model and engine
+   are unchanged.
+3. **Daily-limit custom duration**: the two raw numeric Hours/Minutes text fields are
+   gone, replaced by `ui/components/DurationStepper.kt` (tap +/- steppers, hours
+   0–24, minutes 0–55 in 5-minute steps) — structurally can't produce invalid text,
+   out-of-range values, or an empty field. `DailyLimitInput.toThresholdSeconds`
+   validation is unchanged.
+4. Home screen presentation requirements (branding, real icons/names, no raw package
+   names, "Start Focus" as primary action) were already satisfied as a direct result
+   of item 1 — verified, not separately changed.
+5. **Insights** gained a "Last 14 days at a glance" card: longest single usage
+   session (with resolved app label/icon), focus session count, total focus time, and
+   "daily limits met today" (hidden entirely when no limit rules exist, rather than
+   showing a misleading 0-of-0) — all derived from existing local tables
+   (`sessions`, `focus_sessions`, `rules` + today's `daily_usage`) via a new pure,
+   unit-tested `core/domain/insights/InsightsMetrics.kt`. No AI, no invented
+   statistics.
+
+Onboarding remains the largest not-yet-started piece of Phase 8.
 
 ## Build status — VERIFIED
 
 Ran on 2026-08-17 in this environment (`JAVA_HOME=F:\Android Stu\jbr`,
-`GRADLE_USER_HOME=F:\GradleUserHome`):
+`GRADLE_USER_HOME=F:\GradleUserHome`), after each of the five changes above and again
+at the end:
 
 - `.\gradlew.bat assembleDebug --stacktrace` → **BUILD SUCCESSFUL**
-- `.\gradlew.bat testDebugUnitTest --stacktrace` → **BUILD SUCCESSFUL**, **119/119**
+- `.\gradlew.bat testDebugUnitTest --stacktrace` → **BUILD SUCCESSFUL**, **154/154**
   unit tests pass, 0 failures, 0 errors (summed from the real per-suite XML results
   in `app/build/test-results/`)
 - `.\gradlew.bat connectedDebugAndroidTest --stacktrace` → **BUILD SUCCESSFUL**,
-  **25/25** instrumentation tests pass, run against a real physical device (Pixel 7a,
+  **28/28** instrumentation tests pass, run against a real physical device (Pixel 7a,
   Android 17 / API 37, serial `32201JEHN04765`)
 
 ## Test status — VERIFIED (real counts, not claimed)
@@ -63,36 +93,49 @@ Ran on 2026-08-17 in this environment (`JAVA_HOME=F:\Android Stu\jbr`,
 | Unit | `FocusSessionRepositoryTest` | 8 | pass |
 | Unit | `DailyLimitInputTest` | 7 | pass |
 | Unit | `LegalDocumentsTest` | 7 | pass |
-| **Unit total** | | **119** | **119/119 pass** |
+| Unit | `AppDisplayResolverTest` (new) | 8 | pass |
+| Unit | `ScheduleInputTest` (new) | 9 | pass |
+| Unit | `DurationStepperTest` (new) | 9 | pass |
+| Unit | `InsightsMetricsTest` (new) | 10 | pass |
+| **Unit total** | | **154** | **154/154 pass** |
 | Instrumentation | `OrluneDatabaseMigrationTest` | 1 | pass (real device) |
 | Instrumentation | `BlockingRepositoryInstrumentedTest` | 8 | pass (real device) |
 | Instrumentation | `UsageRepositoryInstrumentedTest` | 7 | pass (real device) |
 | Instrumentation | `ThemePreferenceDaoInstrumentedTest` | 4 | pass (real device) |
-| Instrumentation | `InstalledAppListerInstrumentedTest` | 5 | pass (real device) |
-| **Instrumentation total** | | **25** | **25/25 pass** |
-| **Grand total** | | **144** | **144/144 pass** |
+| Instrumentation | `InstalledAppListerInstrumentedTest` | 8 (+3 new) | pass (real device) |
+| **Instrumentation total** | | **28** | **28/28 pass** |
+| **Grand total** | | **182** | **182/182 pass** |
 
 ## Physical-device status — VERIFIED (manual walkthrough, this session)
 
-Pixel 7a connected over USB. Beyond the automated suites above, manually exercised:
+Pixel 7a connected over USB, via `adb`/`uiautomator` (text-dump verification of real
+rendered UI content, not just build success). Usage Access was temporarily granted
+for the walkthrough and reset to its prior (default/ungranted) state afterward; every
+test rule created during verification was removed afterward — device left as found.
 
-- App picker end-to-end: search filtering, multi-select with per-app remove (Focus),
-  single-select instant-return (Limits), and a full add-limit flow confirming the
-  real app label (not a package name) appears in "Active rules"
-- Launcher icon: app drawer (circular launcher mask, nothing clipped), App Info page
-  (large size, still crisp)
-- About Orlune, reachable directly from Settings root
-- Privacy Center → Legal Center → a document, in both Dark and Light theme, including
-  system back-button navigation at every level (not just in-app back arrows)
-- A full `am force-stop` + relaunch: theme choice and all data survived
-- Clean `logcat` throughout the final, fixed build — no `FATAL EXCEPTION`
+- **Home**: "Most used today" showed real resolved labels ("Claude", "Drive",
+  "WhatsApp", "YouTube", **"Home screen"**) with icons, no raw package names, Orlune
+  itself absent from the list.
+- **Insights**: same resolved labels in "Apps in the last 14 days"; new "Last 14 days
+  at a glance" card confirmed showing "31m · Home screen" for longest session, real
+  focus session/time counts, and "0 of 1" for a deliberately-under-threshold test
+  limit rule (compliance line correctly absent when zero limit rules exist).
+- **Limits → Active rules**: a test limit and a test schedule rule both displayed
+  with real icon + label ("WhatsApp", "3h 30m"; "WhatsApp", "Scheduled restriction")
+  instead of a package name.
+- **Recurring schedule**: day chips and Every day/Weekdays/Weekends presets toggle
+  correctly; tapping Start/End opened a real Material `TimePicker` dialog pre-filled
+  with the current value; a schedule created with the "Every day" preset survived a
+  full `am force-stop` + relaunch.
+- **Daily limit custom duration**: +/- steppers for Hours/Minutes produced a live
+  "= 3h 30m" preview (matching the exact example from the task ask) and persisted
+  correctly into a rule.
+- Clean `logcat` throughout (`*:E AndroidRuntime:E`, filtered to `com.orlune.app`) at
+  every verification step — no `FATAL EXCEPTION`, no crash.
 
-One real crash was found and fixed during this session (not shipped): the first
-version of `LimitsSection`/`FocusSection`/`SettingsSection` passed raw Kotlin
-`data object`/`data class` values as `SaveableStateHolder.SaveableStateProvider`
-keys, which crashed immediately on opening Focus (`IllegalArgumentException: Type of
-the key Root is not supported` — the API requires Bundle-storable keys). Fixed by
-using `.toString()` keys everywhere; re-verified crash-free afterward.
+No new crashes were found this session (the one known crash class — Bundle-unsafe
+`SaveableStateProvider` keys — was already fixed in the prior session and remains
+fixed; unaffected by this session's changes).
 
 ## Implemented features
 
@@ -102,11 +145,17 @@ using `.toString()` keys everywhere; re-verified crash-free afterward.
   and labels via `platform/usage/InstalledAppLister.kt`, which enumerates launchable
   apps through the existing `<queries>`/`CATEGORY_LAUNCHER` manifest declaration —
   not `QUERY_ALL_PACKAGES` (see `docs/app-visibility-compliance.md` for the policy
-  research behind that choice). Wired into Limits (single-select, matching
-  `RuleEntity`'s one-package-per-rule design) and Focus (multi-select) via new
-  `LimitsSection`/`FocusSection` wrapper composables that own each feature's picker
-  sub-navigation, matching the `SettingsSection` pattern already established for the
-  Privacy/Legal Center.
+  research behind that choice). The manifest now also declares `CATEGORY_HOME` (this
+  session), narrowly scoped to make the device's current default launcher resolvable
+  for label/icon purposes — still not `QUERY_ALL_PACKAGES`. Wired into Limits
+  (single-select, matching `RuleEntity`'s one-package-per-rule design) and Focus
+  (multi-select) via `LimitsSection`/`FocusSection` wrapper composables that own each
+  feature's picker sub-navigation, matching the `SettingsSection` pattern.
+- **Presentation layer** (this session): `platform/usage/AppDisplayResolver.kt` +
+  `ui/components/AppDisplayInfoState.kt`/`AppUsageRow.kt`/`AppIcon.kt` — shared,
+  tested label/icon resolution used by Home, Insights, and Limits' Active rules list,
+  so a package name is never shown raw and a stale stored label can't linger in the
+  UI even though the underlying `apps` table row isn't rewritten.
 - **Launcher icon**: adaptive-icon foreground + monochrome layers at all 5 density
   buckets, extracted from `design/orlune-logo-reference.png` (the user-approved
   concept #4 reference) via flood-fill background removal, shipped as raster PNGs
@@ -120,8 +169,9 @@ using `.toString()` keys everywhere; re-verified crash-free afterward.
   LICENSE file exists and Orlune is not (yet) open source — checked against the
   actual repository, not assumed.
 - Privacy architecture: no `INTERNET` permission anywhere, no analytics/ads/AI
-  dependency — re-verified this session via `git diff` showing zero changes to
-  `AndroidManifest.xml`, `app/build.gradle.kts`, or `gradle/libs.versions.toml`.
+  dependency — re-verified this session via `git diff` showing the only manifest
+  change is the narrowly-scoped `CATEGORY_HOME` `<queries>` entry described above; no
+  changes to `app/build.gradle.kts` or `gradle/libs.versions.toml`.
 
 ## Unfinished / not started
 
@@ -148,15 +198,31 @@ this session:
 - Several jurisdictions' applicability to Orlune's local-only architecture is
   explicitly unresolved (see `docs/legal-compliance-matrix.md`) — do not represent
   Orlune as compliant with DPDP, GDPR, CCPA, or COPPA without legal sign-off first.
+- Insights' new "Last 14 days at a glance" card's "Longest session" and "Focus
+  sessions"/"Focus time" facts share the same fresh-install caveat as the app
+  picker's "Frequently used today": correct by construction (verified with real data
+  on the reference device), but not separately device-tested from a true zero-data
+  first run.
+- The `sessions` table has no pruning implemented despite its own KDoc describing
+  "short retention by design" — every closed session is kept indefinitely in
+  practice (confirmed by code inspection: `SessionDao.delete` exists but is never
+  called). This session's new `observeLongestSessionBetween` query relies on that
+  actual (not documented) retention behavior. Not a regression introduced this
+  session, but worth flagging: either the KDoc or the retention behavior should
+  eventually be corrected to match the other.
 
 ## Next recommended task
 
-Pick one, don't start both without checking in:
+Pick one, don't start more than one without checking in:
 
-1. Onboarding flow — the largest remaining piece of Phase 8, and the natural place to
+1. **Notification-policy / Focus quiet-mode implementation** — explicitly deferred
+   from this session at the user's request, to be picked up as its own isolated task.
+2. Onboarding flow — the largest remaining piece of Phase 8, and the natural place to
    introduce the permission requests and app picker for the first time.
-2. Legal review of the Privacy Policy / Terms of Service against
+3. Legal review of the Privacy Policy / Terms of Service against
    `docs/legal-compliance-matrix.md`'s open issues, plus resolving the actual business
    details (legal entity, address, contact) currently held as placeholders.
 
-Do not start either without user sign-off.
+Do not start any without user sign-off. This session's changes exist only as
+uncommitted working-tree changes — not committed, not pushed; see the session's own
+summary for the exact file list.

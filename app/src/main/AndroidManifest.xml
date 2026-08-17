@@ -32,6 +32,21 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!--
+            A launcher/home-replacement app's own activity is registered under
+            CATEGORY_HOME, not CATEGORY_LAUNCHER (Android's documented distinction
+            between "shows up in the app drawer" and "is a home screen the user can
+            set as default"). Without this, PackageManager.getApplicationInfo() for
+            the device's current default launcher throws NameNotFoundException, and
+            AppLabelResolver/InstalledAppLister fall back to showing its raw package
+            name (e.g. "com.google.android.apps.nexuslauncher") in usage lists —
+            still scoped/minimal, not QUERY_ALL_PACKAGES (see
+            docs/app-visibility-compliance.md).
+        -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
     </queries>
 
     <!--

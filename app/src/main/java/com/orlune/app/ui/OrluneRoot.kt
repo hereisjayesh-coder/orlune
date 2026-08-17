@@ -45,6 +45,7 @@ import com.orlune.app.platform.usage.UsageAccessPermission
 import com.orlune.app.ui.navigation.OrluneTab
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.ZoneId
 
 @Composable
 fun OrluneRoot(app: OrluneApplication) {
@@ -77,6 +78,20 @@ fun OrluneRoot(app: OrluneApplication) {
     val sessionCount by app.database.sessionDao().observeCount().collectAsState(initial = 0)
     val dailyUsageCount by app.database.dailyUsageDao().observeCount().collectAsState(initial = 0)
     val todayUsageSecondsByPackage = remember(todayUsage) { todayUsage.associate { it.packageName to it.totalUsageSeconds } }
+
+    // Same "last 14 days" window Insights already uses for comparisonApps —
+    // the longest-session/focus-session facts stay scoped to the same period the
+    // apps list is already labeled with, rather than introducing a second window.
+    val zoneId = remember { ZoneId.systemDefault() }
+    val insightsPeriodStartMillis = remember(previousWeekStart, zoneId) {
+        LocalDate.ofEpochDay(previousWeekStart).atStartOfDay(zoneId).toInstant().toEpochMilli()
+    }
+    val insightsPeriodEndMillisExclusive = remember(today, zoneId) {
+        LocalDate.ofEpochDay(today + 1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+    }
+    val longestSession by app.database.sessionDao()
+        .observeLongestSessionBetween(insightsPeriodStartMillis, insightsPeriodEndMillisExclusive)
+        .collectAsState(initial = null)
 
     var usageAccessGranted by remember { mutableStateOf(UsageAccessPermission.isGranted(context)) }
     var overlayGranted by remember { mutableStateOf(OverlayPermission.isGranted(context)) }
@@ -118,6 +133,8 @@ fun OrluneRoot(app: OrluneApplication) {
                     activeRules = rules.count { it.type == "limit" || it.type == "schedule" },
                     activeFocus = focusSessions.firstOrNull { FocusSessionEngine.stateOf(it, System.currentTimeMillis()) == FocusSessionState.ACTIVE },
                     usageAccessGranted = usageAccessGranted,
+                    installedAppSource = app.installedAppLister,
+                    ownPackageName = context.packageName,
                     onOpenUsageAccess = { context.startActivity(UsageAccessPermission.settingsIntent()) },
                     onRefresh = { scope.launch { app.usageRepository.processNewEvents() } },
                     onFocus = { selectedTab = OrluneTab.FOCUS.name }
@@ -167,7 +184,15 @@ fun OrluneRoot(app: OrluneApplication) {
                     modifier = Modifier.padding(padding),
                     lastWeekTotal = lastWeekTotal,
                     previousWeekTotal = previousWeekTotal,
-                    apps = comparisonApps
+                    apps = comparisonApps,
+                    installedAppSource = app.installedAppLister,
+                    ownPackageName = context.packageName,
+                    rules = rules,
+                    todayUsage = todayUsage,
+                    focusSessions = focusSessions,
+                    longestSession = longestSession,
+                    insightsPeriodStartMillis = insightsPeriodStartMillis,
+                    insightsPeriodEndExclusiveMillis = insightsPeriodEndMillisExclusive
                 )
                 OrluneTab.SETTINGS -> SettingsSection(
                     modifier = Modifier.padding(padding),
