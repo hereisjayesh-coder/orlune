@@ -1,5 +1,6 @@
 package com.orlune.app.feature.limits
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,8 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -21,6 +25,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,23 +47,26 @@ fun LimitsScreen(
     modifier: Modifier,
     apps: List<AppEntity>,
     rules: List<RuleEntity>,
-    onAddLimit: (String, Long) -> Unit,
-    onAddSchedule: (String, String, String, String, String) -> Unit,
+    limitAppLabel: String?,
+    onPickLimitApp: () -> Unit,
+    scheduleAppLabel: String?,
+    onPickScheduleApp: () -> Unit,
+    onAddLimit: (Long) -> Unit,
+    onAddSchedule: (String, String, String, String) -> Unit,
     onDelete: (RuleEntity) -> Unit
 ) {
-    var packageName by rememberSaveable { mutableStateOf("") }
     var selectedPresetMinutes by rememberSaveable { mutableStateOf<Int?>(30) }
     var customSelected by rememberSaveable { mutableStateOf(false) }
     var customHoursText by rememberSaveable { mutableStateOf("") }
     var customMinutesText by rememberSaveable { mutableStateOf("") }
     var limitError by rememberSaveable { mutableStateOf<String?>(null) }
     var scheduleName by rememberSaveable { mutableStateOf("") }
-    var schedulePackage by rememberSaveable { mutableStateOf("") }
     var scheduleDays by rememberSaveable { mutableStateOf("MON,TUE,WED,THU,FRI") }
     var scheduleStart by rememberSaveable { mutableStateOf("22:00") }
     var scheduleEnd by rememberSaveable { mutableStateOf("07:00") }
-    val knownNames = apps.map { it.packageName }
     val scheduleValid = isValidSchedule(scheduleDays, scheduleStart, scheduleEnd)
+    val labelsByPackage = remember(apps) { apps.associate { it.packageName to it.label } }
+
     LazyColumn(modifier = modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Spacer(modifier = Modifier.height(20.dp))
@@ -75,7 +83,7 @@ fun LimitsScreen(
             val currentMinutes = if (customSelected) customMinutesText.toIntOrNull() ?: 0 else (selectedPresetMinutes ?: 0) % 60
             val previewSeconds = (currentHours * 3600L) + (currentMinutes * 60L)
             FormCard("Daily app limit") {
-                OutlinedTextField(value = packageName, onValueChange = { packageName = it }, label = { Text("Package name") }, supportingText = { if (knownNames.isNotEmpty()) Text("Known: ${knownNames.take(3).joinToString()}") }, modifier = Modifier.fillMaxWidth())
+                AppPickerField(label = limitAppLabel, onClick = onPickLimitApp)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.horizontalScroll(rememberScrollState())
@@ -117,14 +125,13 @@ fun LimitsScreen(
                 }
                 Button(
                     onClick = {
-                        if (packageName.isBlank()) {
-                            limitError = "Enter a package name"
+                        if (limitAppLabel == null) {
+                            limitError = "Choose an app first"
                             return@Button
                         }
                         DailyLimitInput.toThresholdSeconds(currentHours, currentMinutes).fold(
                             onSuccess = { seconds ->
-                                onAddLimit(packageName.trim(), seconds)
-                                packageName = ""
+                                onAddLimit(seconds)
                                 limitError = null
                             },
                             onFailure = { limitError = it.message }
@@ -137,13 +144,23 @@ fun LimitsScreen(
         item {
             FormCard("Recurring schedule") {
                 OutlinedTextField(value = scheduleName, onValueChange = { scheduleName = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = schedulePackage, onValueChange = { schedulePackage = it }, label = { Text("Package name") }, modifier = Modifier.fillMaxWidth())
+                AppPickerField(label = scheduleAppLabel, onClick = onPickScheduleApp)
                 OutlinedTextField(value = scheduleDays, onValueChange = { scheduleDays = it }, label = { Text("Days, e.g. MON,WED") }, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = scheduleStart, onValueChange = { scheduleStart = it }, label = { Text("Start") }, modifier = Modifier.weight(1f))
                     OutlinedTextField(value = scheduleEnd, onValueChange = { scheduleEnd = it }, label = { Text("End") }, modifier = Modifier.weight(1f))
                 }
-                Button(onClick = { if (scheduleName.isNotBlank() && schedulePackage.isNotBlank() && scheduleValid) { onAddSchedule(scheduleName.trim(), schedulePackage.trim(), scheduleDays.trim().uppercase(), scheduleStart.trim(), scheduleEnd.trim()); scheduleName = ""; schedulePackage = "" } }, enabled = scheduleName.isNotBlank() && schedulePackage.isNotBlank() && scheduleValid, modifier = Modifier.fillMaxWidth()) { Text("Add schedule") }
+                val scheduleReady = scheduleName.isNotBlank() && scheduleAppLabel != null && scheduleValid
+                Button(
+                    onClick = {
+                        if (scheduleReady) {
+                            onAddSchedule(scheduleName.trim(), scheduleDays.trim().uppercase(), scheduleStart.trim(), scheduleEnd.trim())
+                            scheduleName = ""
+                        }
+                    },
+                    enabled = scheduleReady,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Add schedule") }
             }
         }
         item { Text("Active rules", style = MaterialTheme.typography.titleLarge) }
@@ -151,12 +168,31 @@ fun LimitsScreen(
         items(rules, key = { it.id }) { rule ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(rule.targetPackageOrCategory, fontWeight = FontWeight.Medium)
+                    Text(labelsByPackage[rule.targetPackageOrCategory] ?: rule.targetPackageOrCategory, fontWeight = FontWeight.Medium)
                     Text(if (rule.type == "limit") "Daily limit · ${formatDuration(rule.threshold ?: 0)}" else "Scheduled restriction", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 TextButton(onClick = { onDelete(rule) }) { Text("Remove") }
             }
         }
         item { Spacer(modifier = Modifier.height(20.dp)) }
+    }
+}
+
+@Composable
+private fun AppPickerField(label: String?, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label ?: "Choose an app",
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (label != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

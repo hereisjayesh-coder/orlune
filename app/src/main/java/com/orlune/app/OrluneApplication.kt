@@ -16,6 +16,7 @@ import com.orlune.app.data.repository.UsageRepository
 import com.orlune.app.platform.blocking.BlockingMonitorService
 import com.orlune.app.platform.blocking.OverlayPermission
 import com.orlune.app.platform.usage.AppLabelResolver
+import com.orlune.app.platform.usage.InstalledAppLister
 import com.orlune.app.platform.usage.UsageAccessPermission
 import com.orlune.app.platform.usage.UsageEventReader
 import com.orlune.app.platform.usage.worker.OrluneWorkerFactory
@@ -46,6 +47,8 @@ class OrluneApplication : Application(), Configuration.Provider {
             userPreferenceDao = database.userPreferenceDao()
         )
     }
+
+    val installedAppLister: InstalledAppLister by lazy { InstalledAppLister(this) }
 
     val blockingRepository: BlockingRepository by lazy {
         BlockingRepository(

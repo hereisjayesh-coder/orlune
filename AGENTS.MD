@@ -64,7 +64,14 @@ data/       Room database (local/) and repositories (repository/) — the only l
 core/       Pure Kotlin business logic — domain/usage, domain/rules, domain/focus —
             no Android framework import, fully unit-testable on the JVM
 feature/    Compose UI screens, one package per screen (home/focus/limits/insights/
-            settings implemented; onboarding/privacy still empty — deferred features)
+            settings/privacy/apppicker implemented; onboarding still empty — deferred).
+            Screens with their own sub-navigation (app picker, Privacy/Legal Center)
+            are wrapped in a "Section" composable (e.g. LimitsSection, FocusSection,
+            SettingsSection) that owns a manual back-stack + rememberSaveableStateHolder
+            — see any of those three for the established pattern before adding a new one
+platform/usage/InstalledAppLister.kt enumerates launchable apps for the app picker via
+            the existing `<queries>`/CATEGORY_LAUNCHER manifest declaration — never add
+            QUERY_ALL_PACKAGES; see docs/app-visibility-compliance.md for why
 ui/         Shared Compose theme (ui/theme/), reusable components (ui/components/),
             and the OrluneTab enum + bottom-nav wiring (ui/navigation/); OrluneRoot.kt
             is the thin composition root that owns state and delegates to feature/

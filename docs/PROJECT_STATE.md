@@ -1,10 +1,14 @@
 # Orlune — Project State
 
-**Last verification date:** 2026-08-17 (Compose shell reorganized into the
-documented `feature/`/`ui/components`/`ui/navigation` architecture; real Material
-icons added to the bottom nav; dead `DebugScreen` removed from `MainActivity.kt`)
+**Last verification date:** 2026-08-17 (app picker replacing raw package-name input;
+launcher icon implemented from the approved reference; Privacy & Legal Center
+expanded to full requested structure with new compliance docs)
 
-**Latest verified commit:** `79e209d` — "feat: add initial Orlune product shell" (`main`). The 2026-08-17 UI reorganization described below is **uncommitted** working-tree state on top of this commit — verify with `git status`/`git diff` before trusting this file's claims about file layout if picking this up later.
+**Latest verified commit:** working tree as of this file's date, on top of `8451fcb`
+("feat: implement approved launcher icon from Logo.PNG reference, polish Privacy &
+Legal Center") — verify with `git log`/`git status` before trusting this file's
+claims if picking this up later; this file is a snapshot, not a substitute for
+checking the real repository state.
 
 This file is the living status snapshot. `AGENTS.MD` is the stable rules/conventions
 file — read that first for *how* to work on this repo, this file for *where things
@@ -15,148 +19,144 @@ significant change; keep `AGENTS.MD` stable unless a rule itself changes.
 
 ## Current phase
 
-**Phase 6 (Focus Sessions) and a Room v1→v2 migration are implemented and tested.**
-The initial Compose product shell and local export/delete controls are now present,
-and (as of 2026-08-17) reorganized into the architecture `AGENTS.MD` documents:
-`ui/OrluneRoot.kt` is now a thin composition root, `feature/home`, `feature/focus`,
-`feature/limits`, `feature/insights`, `feature/settings` each hold one screen, shared
-composables live in `ui/components/` (`Cards.kt`, `Rows.kt`, `EmptyState.kt`,
-`DurationFormat.kt`), and `ui/navigation/OrluneTab.kt` carries a real Material
-`ImageVector` icon per tab (replacing the previous text-letter nav icons). This was
-a pure reorganization + icon swap — no screen's layout, logic, or behavior changed.
-Analytics/recommendation algorithms and onboarding remain deferred.
+**Phase 6 is implemented and tested. Phase 8 (UI) and Phase 9 (Privacy Center) both
+advanced significantly this session** — see `ROADMAP.md` for the phase table. The
+biggest UI change since the last snapshot: Limits and Focus no longer accept raw
+package-name text/CSV input anywhere — both use a native app picker
+(`feature/apppicker/AppPickerScreen.kt`) with real app icons, real names, search, and
+"Frequently used today" (from real Insights usage data). The Privacy & Legal Center
+(Settings → Privacy & Legal) now has all 15 requested documents, with the Privacy
+Policy and Terms of Service expanded to their full 23- and 28-section structure,
+informed by this session's research into India's DPDP Act 2023/Rules 2025, GDPR/UK
+GDPR, CCPA/CPRA, and COPPA (see `docs/legal-compliance-matrix.md`) and current Google
+Play policy (see `docs/google-play-privacy-compliance.md`). The launcher icon is now
+implemented from the user-approved reference image (`design/orlune-logo-reference.png`),
+not the earlier placeholder clock mark. Onboarding remains the largest not-yet-started
+piece of Phase 8.
 
 ## Build status — VERIFIED
 
 Ran on 2026-08-17 in this environment (`JAVA_HOME=F:\Android Stu\jbr`,
-`GRADLE_USER_HOME=F:\GradleUserHome`), after the UI reorganization above:
+`GRADLE_USER_HOME=F:\GradleUserHome`):
 
-- `.\gradlew.bat assembleDebug --stacktrace` → **BUILD SUCCESSFUL** (first try, no
-  compile errors from the file split)
-- `.\gradlew.bat testDebugUnitTest --stacktrace` → **BUILD SUCCESSFUL**, 92/92 unit
-  tests pass, 0 failures, 0 errors (summed from the real per-suite XML results in
-  `app/build/test-results/`, not copied from a prior run)
-- `connectedDebugAndroidTest` was **NOT run this pass** — no device connectivity was
-  checked in this session. Re-run and re-verify before trusting instrumentation
-  status; don't assume the 2026-08-16 12/12 result still reflects current code
-  without re-running it, even though this change didn't touch any
-  device/instrumentation-relevant code paths.
+- `.\gradlew.bat assembleDebug --stacktrace` → **BUILD SUCCESSFUL**
+- `.\gradlew.bat testDebugUnitTest --stacktrace` → **BUILD SUCCESSFUL**, **119/119**
+  unit tests pass, 0 failures, 0 errors (summed from the real per-suite XML results
+  in `app/build/test-results/`)
 - `.\gradlew.bat connectedDebugAndroidTest --stacktrace` → **BUILD SUCCESSFUL**,
-  12/12 instrumentation tests pass, 0 failures, run against a real physical device
-  (Pixel 7a, Android 17 / API 37, serial `32201JEHN04765`)
+  **25/25** instrumentation tests pass, run against a real physical device (Pixel 7a,
+  Android 17 / API 37, serial `32201JEHN04765`)
 
 ## Test status — VERIFIED (real counts, not claimed)
 
 | Suite | Class | Tests | Result |
 |---|---|---|---|
 | Unit | `FocusSessionEngineTest` | 13 | pass |
-| Unit | `BlockingEngineTest` | 8 (was 7 — 1 added this audit) | pass |
+| Unit | `BlockingEngineTest` | 8 | pass |
+| Unit | `LegalMarkdownTest` | 13 | pass |
 | Unit | `GoalEngineTest` | 6 | pass |
 | Unit | `LimitEngineTest` | 6 | pass |
 | Unit | `ScheduleEngineTest` | 14 | pass |
 | Unit | `SessionCalculatorTest` | 11 | pass |
 | Unit | `UsageAggregatorTest` | 4 | pass |
 | Unit | `BlockingRepositoryTest` | 22 | pass |
-| Unit | `FocusSessionRepositoryTest` | 6 | pass |
-| **Unit total** | | **92** | **92/92 pass** |
+| Unit | `FocusSessionRepositoryTest` | 8 | pass |
+| Unit | `DailyLimitInputTest` | 7 | pass |
+| Unit | `LegalDocumentsTest` | 7 | pass |
+| **Unit total** | | **119** | **119/119 pass** |
 | Instrumentation | `OrluneDatabaseMigrationTest` | 1 | pass (real device) |
 | Instrumentation | `BlockingRepositoryInstrumentedTest` | 8 | pass (real device) |
-| Instrumentation | `UsageRepositoryInstrumentedTest` | 3 | pass (real device) |
-| **Instrumentation total** | | **12** | **12/12 pass** |
-| **Grand total** | | **102** | **102/102 pass** |
+| Instrumentation | `UsageRepositoryInstrumentedTest` | 7 | pass (real device) |
+| Instrumentation | `ThemePreferenceDaoInstrumentedTest` | 4 | pass (real device) |
+| Instrumentation | `InstalledAppListerInstrumentedTest` | 5 | pass (real device) |
+| **Instrumentation total** | | **25** | **25/25 pass** |
+| **Grand total** | | **144** | **144/144 pass** |
 
-## Physical-device status — VERIFIED
+## Physical-device status — VERIFIED (manual walkthrough, this session)
 
-Pixel 7a connected over USB, `adb devices` lists it, `connectedDebugAndroidTest` ran
-and passed against it (real SQLite, real Room migration, not an emulator/Robolectric
-double). Manual on-device exercise of the full UI flow (permissions, blocking,
-focus sessions) was **not** re-performed in this audit — TODO.md's Phase 3/5 manual
-device-exercise claims from 2026-08-16 predate this audit and were not re-verified
-end-to-end interactively; only the automated instrumentation suite was re-run.
+Pixel 7a connected over USB. Beyond the automated suites above, manually exercised:
+
+- App picker end-to-end: search filtering, multi-select with per-app remove (Focus),
+  single-select instant-return (Limits), and a full add-limit flow confirming the
+  real app label (not a package name) appears in "Active rules"
+- Launcher icon: app drawer (circular launcher mask, nothing clipped), App Info page
+  (large size, still crisp)
+- About Orlune, reachable directly from Settings root
+- Privacy Center → Legal Center → a document, in both Dark and Light theme, including
+  system back-button navigation at every level (not just in-app back arrows)
+- A full `am force-stop` + relaunch: theme choice and all data survived
+- Clean `logcat` throughout the final, fixed build — no `FATAL EXCEPTION`
+
+One real crash was found and fixed during this session (not shipped): the first
+version of `LimitsSection`/`FocusSection`/`SettingsSection` passed raw Kotlin
+`data object`/`data class` values as `SaveableStateHolder.SaveableStateProvider`
+keys, which crashed immediately on opening Focus (`IllegalArgumentException: Type of
+the key Root is not supported` — the API requires Bundle-storable keys). Fixed by
+using `.toString()` keys everywhere; re-verified crash-free afterward.
 
 ## Implemented features
 
-- Usage monitoring pipeline: `UsageEventReader` → `SessionCalculator` →
-  `UsageAggregator` → `UsageRepository` → Room, driven by a 15-minute WorkManager
-  periodic worker plus on-demand refresh from the debug UI.
-- Deterministic rule engines: `LimitEngine`, `ScheduleEngine`, `BlockingEngine`,
-  `GoalEngine` — pure Kotlin, unit-tested.
-- App blocking: `BlockingMonitorService` (3s foreground-service poll) →
-  `BlockingRepository.evaluate()` → `BlockOverlayController` (`SYSTEM_ALERT_WINDOW`
-  overlay). Essential-app allow-list, daily-limit rules, and schedule rules all wired
-  and tested.
-- Focus sessions (Phase 6): `FocusSessionEngine` (pure, state derived from
-  timestamps — no stored status column) + `FocusSessionRepository`
-  (start/reconcile/cancel), integrated into `BlockingRepository.evaluate()` as an
-  additional OR'd trigger alongside rules. Supports immediate and one-time-delayed
-  ("start in N minutes") sessions. **Recurring focus scheduling does not exist** —
-  don't add it without reviewing this design with the user first.
-- Room v1→v2 migration (`OrluneMigrations.MIGRATION_1_2`): adds `schedules.name` and
-  `focus_sessions.blockedPackages`, both `NOT NULL DEFAULT ''`, verified
-  non-destructive by `OrluneDatabaseMigrationTest` against all 16 tables' real data,
-  and re-verified this audit on a real device.
-- Privacy architecture: no `INTERNET` permission anywhere, `allowBackup=false`, empty
-  cloud-backup/device-transfer extraction rules, no analytics/ads/AI dependency —
-  all re-verified this audit (manifest, `libs.versions.toml`, `build.gradle.kts`,
-  full-repo secret/credential grep — all clean).
+- Usage monitoring, deterministic rule engines, app blocking, and focus sessions —
+  unchanged this session; see prior snapshots / `TODO.md` for their history.
+- **App picker** (`feature/apppicker/AppPickerScreen.kt`): real installed-app icons
+  and labels via `platform/usage/InstalledAppLister.kt`, which enumerates launchable
+  apps through the existing `<queries>`/`CATEGORY_LAUNCHER` manifest declaration —
+  not `QUERY_ALL_PACKAGES` (see `docs/app-visibility-compliance.md` for the policy
+  research behind that choice). Wired into Limits (single-select, matching
+  `RuleEntity`'s one-package-per-rule design) and Focus (multi-select) via new
+  `LimitsSection`/`FocusSection` wrapper composables that own each feature's picker
+  sub-navigation, matching the `SettingsSection` pattern already established for the
+  Privacy/Legal Center.
+- **Launcher icon**: adaptive-icon foreground + monochrome layers at all 5 density
+  buckets, extracted from `design/orlune-logo-reference.png` (the user-approved
+  concept #4 reference) via flood-fill background removal, shipped as raster PNGs
+  rather than hand-vectorized (to avoid drifting from the approved reference's
+  gradients). `ic_launcher_background` is `#000000`, exactly matching the reference.
+- **Privacy & Legal Center**: 15 documents (Privacy Policy expanded to 23 sections,
+  Terms of Service to 28), all still development drafts with explicit `[TBD]`
+  placeholders for unresolved business/legal facts — no company name, address, or
+  contact was invented. Cross-references `docs/legal-compliance-matrix.md` and
+  `docs/google-play-privacy-compliance.md`. "About Orlune" explicitly states no
+  LICENSE file exists and Orlune is not (yet) open source — checked against the
+  actual repository, not assumed.
+- Privacy architecture: no `INTERNET` permission anywhere, no analytics/ads/AI
+  dependency — re-verified this session via `git diff` showing zero changes to
+  `AndroidManifest.xml`, `app/build.gradle.kts`, or `gradle/libs.versions.toml`.
 
 ## Unfinished / not started
 
-Onboarding is not yet a dedicated first-run flow. The product shell now includes Home,
-Focus, Limits, Insights, Settings, permission status, local JSON export, and delete-all
-controls; a fuller Privacy Center and broader test/release hardening remain. Analytics/
-recommendation algorithms, AccessibilityService, and website/VPN blocking remain
-deliberately deferred.
-
-## Bugs found and fixed this audit
-
-1. **`BlockingEngine.decide()` — allow/block precedence violated by list order**
-   (`core/domain/rules/BlockingEngine.kt`). `AppListEntryEntity`'s primary key is
-   `(packageName, listType)`, so a package can legally have both a "block" row and
-   an "allow" row simultaneously. The old code picked `appListEntries.firstOrNull { it.packageName == packageName }`
-   against a list built as `blockEntries + allowEntries` (`BlockingRepository.evaluate()`),
-   so when both existed for the same package, the block entry — always first in the
-   concatenation — silently won, contradicting the documented and tested precedence
-   ("an explicit ALLOW list entry always wins... must override any triggered rule").
-   Not reachable through the current debug UI (which only ever writes "allow" rows),
-   but live in the DAO/entity layer and would silently break the essential-app safety
-   guarantee once a real UI, import, or future feature could write both rows for the
-   same package. **Fixed**: precedence is now decided by the *set* of list types
-   present for the package, not list order — ALLOW checked first regardless of
-   position. Added a regression test
-   (`allow entry wins even when a block entry exists for the same package`).
-2. **`OrluneDatabase.kt` KDoc — stale, actively misleading migration claim**. The
-   class doc said version 2 uses `fallbackToDestructiveMigration()` "since... no
-   migration path has ever existed" — written before commit `96b93d4` added the real,
-   tested, non-destructive `MIGRATION_1_2` and wired it into `OrluneApplication`. The
-   actual code was correct; only the comment was wrong, but a future agent trusting
-   this comment over the code could easily reintroduce a destructive migration
-   believing there'd been no working alternative. **Fixed**: KDoc now describes the
-   real migration and points to `OrluneMigrations.kt` and `OrluneDatabaseMigrationTest`.
-
-Neither bug affected currently-shipped behavior in a way real usage could trigger
-today (see reachability notes above), but both were real, silent violations of this
-project's own documented safety contracts, exactly the class of defect this audit
-was commissioned to find.
+Onboarding is still not a dedicated first-run flow. Recurring focus-session
+scheduling remains out of scope pending a separate product decision. The Privacy &
+Legal Center's documents are development drafts, not lawyer-reviewed or published —
+see `docs/legal-compliance-matrix.md`'s "Legal review required" column for exactly
+what's outstanding before any public claim of compliance. No privacy-policy URL is
+hosted anywhere yet, which blocks Google Play submission independent of the document
+content itself. Analytics/recommendation algorithms, AccessibilityService, and
+website/VPN blocking remain deliberately deferred.
 
 ## Known risks (not yet fixed — deliberately left for a future task)
 
-See `AGENTS.MD`'s "Known risks" section — kept there since it's read alongside the
-rules that explain why each one matters. Summary: overlapping/concurrent focus
-sessions aren't explicitly prevented (a product decision, not obviously a bug);
-recurring focus scheduling remains intentionally out of scope; manual UI/device
-exercise must be repeated after the shell replacement; minor
-`docs/dependency-audit.md` test-dependency table gap.
+See `AGENTS.MD`'s "Known risks" section for the standing list (overlapping focus
+sessions, recurring scheduling scope, minor dependency-audit doc gap). Additions from
+this session:
+
+- The app-picker's "Frequently used today" section and per-row usage subtext depend
+  on `todayUsage`, which is only populated after Usage Access is granted and at least
+  one refresh has run — on a completely fresh install with no usage data yet, the
+  picker still works (falls back to the plain "All apps" list), but this hasn't been
+  explicitly device-tested from a true first-run, zero-data state.
+- Several jurisdictions' applicability to Orlune's local-only architecture is
+  explicitly unresolved (see `docs/legal-compliance-matrix.md`) — do not represent
+  Orlune as compliant with DPDP, GDPR, CCPA, or COPPA without legal sign-off first.
 
 ## Next recommended task
 
 Pick one, don't start both without checking in:
 
-1. Repeat the Compose shell flow and export/delete flow on the physical Pixel 7a,
-   then perform a release-hardening review.
-2. Decide with the user whether to add a dedicated onboarding/Privacy Center flow or
-   move to deferred analytics/recommendation work. Do not add recurring focus
-   scheduling without a separate product decision.
+1. Onboarding flow — the largest remaining piece of Phase 8, and the natural place to
+   introduce the permission requests and app picker for the first time.
+2. Legal review of the Privacy Policy / Terms of Service against
+   `docs/legal-compliance-matrix.md`'s open issues, plus resolving the actual business
+   details (legal entity, address, contact) currently held as placeholders.
 
-Do not start either without user sign-off — this audit's mandate was to stabilize
-and document, not to open new feature work.
+Do not start either without user sign-off.

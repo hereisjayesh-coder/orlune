@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import com.orlune.app.feature.privacy.LegalCenterScreen
 import com.orlune.app.feature.privacy.LegalDocumentScreen
@@ -43,48 +44,60 @@ fun SettingsSection(
 ) {
     val backStack = remember { mutableStateListOf<SettingsDestination>(SettingsDestination.Root) }
     BackHandler(enabled = backStack.size > 1) { backStack.removeAt(backStack.lastIndex) }
+    // Retains each destination's own state (e.g. a document's scroll position)
+    // across a visit to a nested destination and back.
+    val saveableStateHolder = rememberSaveableStateHolder()
 
     when (val destination = backStack.last()) {
-        SettingsDestination.Root -> SettingsScreen(
-            modifier = modifier,
-            themeMode = themeMode,
-            usageAccessGranted = usageAccessGranted,
-            overlayGranted = overlayGranted,
-            notificationGranted = notificationGranted,
-            onThemeChange = onThemeChange,
-            onOpenUsageAccess = onOpenUsageAccess,
-            onOpenOverlay = onOpenOverlay,
-            onExport = onExport,
-            onDeleteRequest = onDeleteRequest,
-            onOpenPrivacyCenter = { backStack.add(SettingsDestination.PrivacyCenter) }
-        )
-        SettingsDestination.PrivacyCenter -> PrivacyCenterScreen(
-            modifier = modifier,
-            onBack = { backStack.removeAt(backStack.lastIndex) },
-            sessionCount = sessionCount,
-            dailyUsageCount = dailyUsageCount,
-            ruleCount = ruleCount,
-            focusSessionCount = focusSessionCount,
-            knownAppCount = knownAppCount,
-            usageAccessGranted = usageAccessGranted,
-            overlayGranted = overlayGranted,
-            notificationGranted = notificationGranted,
-            onOpenUsageAccess = onOpenUsageAccess,
-            onOpenOverlay = onOpenOverlay,
-            onExport = onExport,
-            onDeleteAllRequest = onDeleteRequest,
-            onResetRequest = onResetRequest,
-            onOpenLegalCenter = { backStack.add(SettingsDestination.LegalCenter) }
-        )
-        SettingsDestination.LegalCenter -> LegalCenterScreen(
-            modifier = modifier,
-            onBack = { backStack.removeAt(backStack.lastIndex) },
-            onOpenDocument = { id -> backStack.add(SettingsDestination.LegalDocument(id)) }
-        )
-        is SettingsDestination.LegalDocument -> LegalDocumentScreen(
-            modifier = modifier,
-            documentId = destination.id,
-            onBack = { backStack.removeAt(backStack.lastIndex) }
-        )
+        SettingsDestination.Root -> saveableStateHolder.SaveableStateProvider(SettingsDestination.Root.toString()) {
+            SettingsScreen(
+                modifier = modifier,
+                themeMode = themeMode,
+                usageAccessGranted = usageAccessGranted,
+                overlayGranted = overlayGranted,
+                notificationGranted = notificationGranted,
+                onThemeChange = onThemeChange,
+                onOpenUsageAccess = onOpenUsageAccess,
+                onOpenOverlay = onOpenOverlay,
+                onExport = onExport,
+                onDeleteRequest = onDeleteRequest,
+                onOpenPrivacyCenter = { backStack.add(SettingsDestination.PrivacyCenter) },
+                onOpenAbout = { backStack.add(SettingsDestination.LegalDocument("about-orlune")) }
+            )
+        }
+        SettingsDestination.PrivacyCenter -> saveableStateHolder.SaveableStateProvider(SettingsDestination.PrivacyCenter.toString()) {
+            PrivacyCenterScreen(
+                modifier = modifier,
+                onBack = { backStack.removeAt(backStack.lastIndex) },
+                sessionCount = sessionCount,
+                dailyUsageCount = dailyUsageCount,
+                ruleCount = ruleCount,
+                focusSessionCount = focusSessionCount,
+                knownAppCount = knownAppCount,
+                usageAccessGranted = usageAccessGranted,
+                overlayGranted = overlayGranted,
+                notificationGranted = notificationGranted,
+                onOpenUsageAccess = onOpenUsageAccess,
+                onOpenOverlay = onOpenOverlay,
+                onExport = onExport,
+                onDeleteAllRequest = onDeleteRequest,
+                onResetRequest = onResetRequest,
+                onOpenLegalCenter = { backStack.add(SettingsDestination.LegalCenter) }
+            )
+        }
+        SettingsDestination.LegalCenter -> saveableStateHolder.SaveableStateProvider(SettingsDestination.LegalCenter.toString()) {
+            LegalCenterScreen(
+                modifier = modifier,
+                onBack = { backStack.removeAt(backStack.lastIndex) },
+                onOpenDocument = { id -> backStack.add(SettingsDestination.LegalDocument(id)) }
+            )
+        }
+        is SettingsDestination.LegalDocument -> saveableStateHolder.SaveableStateProvider(destination.toString()) {
+            LegalDocumentScreen(
+                modifier = modifier,
+                documentId = destination.id,
+                onBack = { backStack.removeAt(backStack.lastIndex) }
+            )
+        }
     }
 }

@@ -11,8 +11,11 @@ monitoring, deterministic rule engine, app blocking), and Phase 6 (focus session
 implemented with a preserving Room migration — see `docs/PROJECT_STATE.md` for the current, dated snapshot
 (build/test status, known bugs, next task) and `ROADMAP.md` for phase-by-phase detail.
 `TODO.md` has full task-level history. The current Compose shell provides Home, Focus,
-Limits, Insights, and Settings flows; remaining onboarding and release hardening are
-tracked in `docs/PROJECT_STATE.md` and `ROADMAP.md`.
+Limits, Insights, and Settings flows, with a native app picker (real icons/names,
+search, no raw package names shown to users) for choosing which apps a rule or focus
+session applies to, and a Privacy & Legal Center with 15 documents, reachable offline
+from Settings. Remaining onboarding and release hardening are tracked in
+`docs/PROJECT_STATE.md` and `ROADMAP.md`.
 
 Agents picking up this repo: start with `AGENTS.MD`, then `docs/PROJECT_STATE.md`.
 
@@ -41,6 +44,9 @@ Agents picking up this repo: start with `AGENTS.MD`, then `docs/PROJECT_STATE.md
 - `docs/android-platform-capabilities.md` — what the Android SDK can and can't do for usage monitoring and blocking
 - `docs/accessibility-service-compliance.md` — AccessibilityService use, disclosure, and Play compliance
 - `docs/dependency-audit.md` — every dependency in the project, with purpose/license/network/telemetry/privacy notes
+- `docs/app-visibility-compliance.md` — why and how the app picker enumerates installed apps, and why it doesn't use `QUERY_ALL_PACKAGES`
+- `docs/legal-compliance-matrix.md` — jurisdiction-by-jurisdiction (India DPDP, GDPR/UK GDPR, CCPA/CPRA, COPPA) applicability tracking for the in-app legal documents
+- `docs/google-play-privacy-compliance.md` — Google Play Data Safety / User Data / permissions policy mapping
 - `ARCHITECTURE.md` — as-built package structure and verified build toolchain
 - `ROADMAP.md` — phase-by-phase status
 - `TODO.md` — task-level history

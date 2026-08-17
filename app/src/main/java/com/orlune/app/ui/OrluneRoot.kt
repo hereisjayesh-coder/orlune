@@ -33,10 +33,10 @@ import com.orlune.app.data.local.entity.RuleEntity
 import com.orlune.app.data.local.entity.ScheduleEntity
 import com.orlune.app.data.local.entity.ThemePreferenceEntity
 import com.orlune.app.data.privacy.LocalDataExporter
-import com.orlune.app.feature.focus.FocusScreen
+import com.orlune.app.feature.focus.FocusSection
 import com.orlune.app.feature.home.HomeScreen
 import com.orlune.app.feature.insights.InsightsScreen
-import com.orlune.app.feature.limits.LimitsScreen
+import com.orlune.app.feature.limits.LimitsSection
 import com.orlune.app.feature.settings.SettingsSection
 import com.orlune.app.platform.blocking.BlockingMonitorService
 import com.orlune.app.platform.blocking.NotificationPermission
@@ -76,6 +76,7 @@ fun OrluneRoot(app: OrluneApplication) {
     val themePreference by app.database.themePreferenceDao().observe().collectAsState(initial = null)
     val sessionCount by app.database.sessionDao().observeCount().collectAsState(initial = 0)
     val dailyUsageCount by app.database.dailyUsageDao().observeCount().collectAsState(initial = 0)
+    val todayUsageSecondsByPackage = remember(todayUsage) { todayUsage.associate { it.packageName to it.totalUsageSeconds } }
 
     var usageAccessGranted by remember { mutableStateOf(UsageAccessPermission.isGranted(context)) }
     var overlayGranted by remember { mutableStateOf(OverlayPermission.isGranted(context)) }
@@ -121,9 +122,11 @@ fun OrluneRoot(app: OrluneApplication) {
                     onRefresh = { scope.launch { app.usageRepository.processNewEvents() } },
                     onFocus = { selectedTab = OrluneTab.FOCUS.name }
                 )
-                OrluneTab.FOCUS -> FocusScreen(
+                OrluneTab.FOCUS -> FocusSection(
                     modifier = Modifier.padding(padding),
-                    apps = apps,
+                    installedAppSource = app.installedAppLister,
+                    ownPackageName = context.packageName,
+                    todayUsageSecondsByPackage = todayUsageSecondsByPackage,
                     sessions = focusSessions,
                     usageAccessGranted = usageAccessGranted,
                     overlayGranted = overlayGranted,
@@ -136,10 +139,13 @@ fun OrluneRoot(app: OrluneApplication) {
                     },
                     onStop = { scope.launch { app.focusSessionRepository.cancelActiveSessions() } }
                 )
-                OrluneTab.LIMITS -> LimitsScreen(
+                OrluneTab.LIMITS -> LimitsSection(
                     modifier = Modifier.padding(padding),
                     apps = apps,
                     rules = rules,
+                    installedAppSource = app.installedAppLister,
+                    ownPackageName = context.packageName,
+                    todayUsageSecondsByPackage = todayUsageSecondsByPackage,
                     onAddLimit = { packageName, seconds ->
                         scope.launch {
                             app.database.ruleDao().upsert(

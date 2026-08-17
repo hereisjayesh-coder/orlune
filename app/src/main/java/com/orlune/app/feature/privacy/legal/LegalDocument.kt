@@ -2,9 +2,9 @@ package com.orlune.app.feature.privacy.legal
 
 /**
  * [body] uses a small self-parsed subset of markdown (see LegalDocumentBody): lines
- * starting with "# " are the document title, "## " are section headers, "- " are
- * bullet items, blank lines separate paragraphs. No markdown library dependency —
- * deliberately, per this project's no-unnecessary-dependency rule.
+ * starting with "# " are the document title, "## "/"### " are section headers, "- "
+ * are bullet items, blank lines separate paragraphs. No markdown library dependency
+ * — deliberately, per this project's no-unnecessary-dependency rule.
  */
 data class LegalDocument(
     val id: String,
@@ -18,9 +18,12 @@ object LegalDocuments {
      * decided (entity name, address, jurisdiction, contact). Every document here is
      * a development-time draft — see "legal-version" — not a reviewed, published
      * legal document. Do not remove the placeholders without replacing them with
-     * real, confirmed values from legal counsel. */
-    const val DOCUMENT_SET_VERSION = "0.1.0-draft"
+     * real, confirmed values from legal counsel. Content is cross-checked against
+     * docs/legal-compliance-matrix.md and docs/google-play-privacy-compliance.md;
+     * update all three together when the underlying facts change. */
+    const val DOCUMENT_SET_VERSION = "0.2.0-draft"
     const val MATCHES_APP_VERSION = "0.1.0"
+    const val EFFECTIVE_DATE_STATUS = "Not yet effective — no version of these documents has been published."
 
     val all: List<LegalDocument> = listOf(
         LegalDocument(
@@ -29,35 +32,85 @@ object LegalDocuments {
             body = """
                 # Privacy Policy
 
-                ## Status
-                This is a draft privacy policy for internal review. It has not been reviewed by a lawyer and is not yet published as Orlune's binding privacy policy. Do not rely on it as a final legal document.
+                ## 1. Introduction
+                This Privacy Policy describes how Orlune ("Orlune," "the app," "we," "us") handles information when you use it. Orlune is developed by [LEGAL ENTITY NAME — TBD]. This is a development-time draft prepared for internal review — it has not been reviewed by a lawyer and is not yet published as Orlune's binding privacy policy. Do not rely on it as a final legal document. See "Legal document version / effective date" for this draft's status.
 
-                ## Who this document is about
-                Orlune is developed by [LEGAL ENTITY NAME — TBD], a [ENTITY TYPE — TBD] registered in [JURISDICTION — TBD], with a registered address at [REGISTERED ADDRESS — TBD]. Questions about this policy can be sent to [CONTACT EMAIL — TBD].
+                ## 2. Scope
+                This Policy covers the Orlune Android application only. It does not cover any third-party app you use alongside Orlune, any Android system behavior outside Orlune's control, or any future Orlune product not yet released. If Orlune ever adds a website, companion service, or account system, this Policy will be revised before that feature ships — it describes today's local-only architecture, not a hypothetical future one.
 
-                ## What Orlune does not do
-                - No account, login, or signup of any kind
-                - No cloud service or backend server operated by Orlune
-                - No advertising SDK, no advertising identifiers collected
-                - No analytics SDK, no crash-reporting SDK
-                - No behavioral tracking of any kind
-                - No artificial intelligence or machine learning processing of your data
-                - No sale or sharing of data with any third party, because no data leaves the device through Orlune
+                ## 3. Definitions
+                "Personal data" means information relating to an identified or identifiable person. "Processing" means anything done with data — collecting, storing, analyzing, or deleting it. "On-device" or "local" means data that exists only in Orlune's private app storage on your device, per Android's standard app-sandboxing model. "Data Fiduciary" and "Data Principal" are terms from India's Digital Personal Data Protection Act, 2023, used here only where that Act may be relevant (see Section 18).
 
-                ## What Orlune measures, and where it happens
-                Orlune reads Android's on-device Usage Access API (UsageStatsManager) to see which apps you open and for how long. This processing happens entirely on your device, inside the Orlune app process. Orlune does not operate any server, so there is nowhere for this information to be sent even if the app wanted to send it — the installed app does not request Android's INTERNET permission, and cannot make network requests as a result.
+                ## 4. Data Orlune accesses
+                Through Android's Usage Access permission (`PACKAGE_USAGE_STATS`), Orlune reads which apps you have opened and for how long, using the `UsageStatsManager` system API. Through the app picker, Orlune reads the list of apps installed on your device that have a launcher icon (see Section 9). Orlune does not access your files, photos, messages, call log, contacts, location, camera, or microphone — it has never requested permission to do so.
 
-                ## What is stored, and where
-                See "Data Collection & Permissions" and "Data Storage & Retention" for the full technical detail. In summary: derived usage sessions, daily usage totals, the rules/schedules/focus sessions you create, your appearance preference, and a small internal processing marker are stored in a local database on your device, in Orlune's private app storage. Nothing here is synced, backed up to any cloud service, or accessible to other apps.
+                ## 5. Data processed locally
+                - Derived app-usage sessions (which app, when it started/ended), computed from raw Usage Access events
+                - Daily usage totals per app
+                - The rules, schedules, and focus sessions you create
+                - An allow/block list of apps you've explicitly configured
+                - Your appearance preference (System/Light/Dark)
+                - A small internal marker used to avoid re-processing the same usage events twice
 
-                ## Your choices
-                You can export a full copy of everything Orlune has stored (see "Data Export & Deletion"), delete all of it at any time from within the app, and revoke any permission from Android Settings at any time. Uninstalling Orlune removes all of its local data from your device.
+                All of this is processed entirely on your device, inside the Orlune app process, and stored in a local database described in Section 11. See Section 9 for what "app metadata" specifically means.
 
-                ## Limits of this claim
-                Orlune's own code does not transmit data anywhere. This document describes what Orlune's software does. It cannot make guarantees about the security of your physical device, your Android OS, or actions outside Orlune's control — for example, a device backup tool you use independently, or physical access to an unlocked device.
+                ## 6. Data not collected
+                Orlune has no account system, so it never collects a name, email address, phone number, or password. It has no advertising SDK and collects no advertising identifier. It has no analytics or crash-reporting SDK and collects no diagnostic or telemetry data. It does not request Android's `INTERNET` permission, so none of the data in Section 5 — or anything else — can be transmitted from your device by Orlune, technically or otherwise.
 
-                ## Changes to this policy
-                If this policy changes after Orlune is released, the new version and its effective date will be shown here, and the version history will be kept in "Legal document version / effective date".
+                ## 7. Purpose of processing
+                Every processing activity described in Section 5 exists to power a specific, visible feature: usage totals power Home and Insights; rules and schedules power the Limits screen and the blocking engine; focus-session data powers the Focus screen; the allow/block list powers essential-app exemptions; appearance preference powers System/Light/Dark theming. Nothing is processed for a purpose you can't see reflected in the app's own screens.
+
+                ## 8. App usage monitoring
+                Orlune's usage pipeline reads raw foreground/background events from `UsageStatsManager`, pairs them into sessions, and aggregates sessions into daily per-app totals — all in a background service on your device. This pipeline cannot run at all until you manually grant Usage Access in Android Settings; Android does not allow apps to request this permission via an in-app dialog.
+
+                ## 9. App/package metadata
+                To show real app names and icons instead of raw package identifiers (e.g. "YouTube" instead of `com.google.android.youtube`), Orlune's app picker reads the list of installed apps that have a launcher entry, using Android's scoped `<queries>` mechanism — not the broader `QUERY_ALL_PACKAGES` permission. See `docs/app-visibility-compliance.md` in the source repository for the full technical rationale. This list is read fresh each time you open the picker and is not saved beyond what a rule or session already references (its package name).
+
+                ## 10. Permissions
+                - Usage Access — measures app usage — granted manually in Android Settings
+                - Display over other apps — shows the block screen — granted manually in Android Settings
+                - Notifications — shows a status notification while monitoring runs — granted via the standard runtime dialog (Android 13+)
+
+                Full detail, including exactly why each permission is needed and what happens if it's denied or revoked, is in "Data Collection & Permissions."
+
+                ## 11. Local database
+                All data in Section 5 is stored in a local SQLite database (via Android's Room library) inside Orlune's private, sandboxed app storage. Cloud backup and device-to-device transfer of this data are explicitly disabled at the Android level (`allowBackup="false"`, empty backup/transfer extraction rules) — it is excluded from Android's automatic backup systems by design, not merely by policy.
+
+                ## 12. Retention
+                Orlune does not delete data automatically. Usage sessions and daily totals accumulate until you delete them yourself; there is no fixed retention window (e.g., "30 days") implemented today. Full detail is in "Data Storage & Retention."
+
+                ## 13. Export
+                "Export local data" in the Privacy Center creates a single JSON file containing every table in Orlune's local database and hands it to Android's system share sheet — you choose where it goes. Orlune does not upload this file anywhere itself.
+
+                ## 14. Deletion
+                "Delete all local data" and "Reset application" both immediately and irreversibly clear every table in Orlune's local database. Uninstalling Orlune removes its private app storage entirely, as a standard consequence of Android's app-storage model, independent of whether you use the in-app delete option first.
+
+                ## 15. Security
+                Orlune's security posture is built around having no network attack surface: no `INTERNET` permission, no server, no listening socket. Standard Android app sandboxing isolates its local storage from other apps without root access. Full detail, including what this does not cover (a rooted device, physical access to an unlocked device), is in "Security Statement."
+
+                ## 16. Children's and teen users
+                Orlune has no age gate, no account, and no age-based feature differentiation — it processes the same on-device data regardless of who uses it. Whether specific children's-privacy obligations (India's DPDP Act Section 9, COPPA, or similar) apply to Orlune has not been determined. See "Children & Teen Privacy" and `docs/legal-compliance-matrix.md`.
+
+                ## 17. International users
+                Orlune may be used by people in jurisdictions with their own data-protection frameworks (for example, the EU/UK's GDPR regime, or California's CCPA/CPRA). Whether and how each framework applies to a local-only, non-transmitting app has not been finalized — see `docs/legal-compliance-matrix.md` for the current, per-jurisdiction analysis and its open questions.
+
+                ## 18. Legal basis / applicable legal framework
+                Where a legal basis for processing is required by an applicable framework (for example, GDPR's Article 6, or DPDP's consent/legitimate-use grounds), Orlune's on-device-only processing is intended to rely on it being processing you directly initiate and control, for your own benefit, entirely on your own device. Whether this reasoning is legally sufficient under each specific framework is an open question — see `docs/legal-compliance-matrix.md`. [LEGAL REVIEW REQUIRED — TBD]
+
+                ## 19. User rights
+                Because your data never leaves your device, most rights a privacy law grants against a data holder (access, correction, erasure, portability) are things Orlune already gives you directly, immediately, and without needing to make a request to anyone: Export gives you a full copy: Delete gives you full erasure; there is nothing held elsewhere to correct or port. If you believe a right you're entitled to isn't covered by these in-app controls, contact us using Section 20.
+
+                ## 20. Grievance and contact process
+                Questions or concerns about this Policy: [CONTACT EMAIL — TBD]. Some jurisdictions require a named grievance officer or regional representative — this has not yet been designated. Full detail is in "Contact / Grievance."
+
+                ## 21. Policy updates
+                If this Policy changes after Orlune is released, the new version and its effective date will be shown here, and prior versions' change history will be kept in "Legal document version / effective date."
+
+                ## 22. Effective date
+                Not yet effective — no version of this Policy has been published.
+
+                ## 23. Version
+                Document set version 0.2.0-draft, matching app version 0.1.0.
             """.trimIndent()
         ),
         LegalDocument(
@@ -67,28 +120,91 @@ object LegalDocuments {
                 # Terms of Service
 
                 ## Status
-                Draft, not yet legally reviewed or published. Placeholder terms for internal development use.
+                Draft, not yet legally reviewed or published. Placeholder terms for internal development use. Also referred to as "Terms & Conditions."
 
-                ## Agreement
-                By installing and using Orlune, published by [LEGAL ENTITY NAME — TBD], you agree to these terms. If you do not agree, do not use the app.
+                ## 1. Acceptance
+                By installing and using Orlune, you agree to these Terms. If you do not agree, do not install or use the app.
 
-                ## What Orlune is
-                Orlune is a local, offline digital wellbeing application for Android. It helps you observe your own app usage and optionally set limits, schedules, and focus sessions to reduce distracting use. There is no account system — these terms apply to your use of the software itself, not to any service, since Orlune operates no service.
+                ## 2. Eligibility
+                Orlune does not currently verify age or eligibility — there is no account system to gate. If you are using Orlune on behalf of a child or a device you manage for someone else, see "Children & Teen Privacy" for the current, unresolved state of that question.
 
-                ## License to use the app
-                Subject to these terms, you are granted a personal, non-exclusive, non-transferable, revocable license to install and use Orlune on devices you own or control, for your own personal use.
+                ## 3. Description of Orlune
+                Orlune is a local, offline digital-wellbeing application for Android, published by [LEGAL ENTITY NAME — TBD]. It helps you observe your own app usage and optionally set limits, schedules, and focus sessions. It operates no backend service — these Terms govern your use of the software itself.
 
-                ## No warranty
-                Orlune is provided "as is." To the maximum extent permitted by [JURISDICTION — TBD] law, Orlune and [LEGAL ENTITY NAME — TBD] disclaim all warranties, express or implied, including fitness for a particular purpose. See "Wellness / Product Disclaimer" for specific limitations around app-blocking reliability.
+                ## 4. Free-use license
+                Subject to these Terms and the "Intellectual Property" and "Open-Source Components" sections below, you are granted a personal, non-exclusive, non-transferable, revocable license to install and use Orlune on devices you own or control, for your own personal, non-commercial use, at no charge.
 
-                ## Limitation of liability
-                To the maximum extent permitted by law, [LEGAL ENTITY NAME — TBD] is not liable for indirect, incidental, or consequential damages arising from use of the app, including missed deadlines, lost productivity, or distress arising from blocking behavior working differently than expected.
+                ## 5. User responsibilities
+                You are responsible for the device Orlune runs on, for granting or withholding the permissions it requests, and for the rules, schedules, and focus sessions you configure. Orlune enforces exactly what you set up — it does not exercise independent judgment about what should be blocked.
 
-                ## Changes and termination
-                You may stop using Orlune and uninstall it at any time. [LEGAL ENTITY NAME — TBD] may update these terms; continued use after an update constitutes acceptance of the revised terms.
+                ## 6. Rules and app-blocking limitations
+                Orlune's blocking relies on Android's overlay mechanism, checked periodically by a background service — not real-time, kernel-level enforcement. See "Wellness / Product Disclaimer" for the full, specific list of known limitations (detection latency, overlay opt-outs on Android 12+, OEM background-kill behavior). By using Orlune's blocking features, you accept these limitations as inherent to the platform, not as defects.
 
-                ## Governing law
-                These terms are governed by the laws of [JURISDICTION — TBD], without regard to conflict-of-law principles, pending confirmation by legal counsel.
+                ## 7. Device/OS limitations
+                Orlune's functionality depends on Android APIs and permissions that vary by manufacturer, OS version, and user-configured battery/background-process settings. [LEGAL ENTITY NAME — TBD] does not control, and is not responsible for, how a given device or OS build implements these APIs.
+
+                ## 8. Permissions
+                Orlune requests only the permissions described in "Data Collection & Permissions." You may revoke any of them at any time in Android Settings; doing so degrades or disables the corresponding feature (see that document for exactly which) rather than crashing the app.
+
+                ## 9. No guarantee of uninterrupted enforcement
+                Orlune does not guarantee that a rule, schedule, or focus session will block every attempt to open a restricted app, every time, without exception. See "Wellness / Product Disclaimer."
+
+                ## 10. No medical or mental-health treatment claim
+                Orlune is a self-directed productivity and digital-wellbeing tool. It is designed to support more intentional digital habits — it is not a medical device, therapeutic product, or treatment for any condition, and makes no claim to diagnose, treat, cure, or prevent addiction, ADHD, anxiety, depression, or any other medical or mental-health condition. If you are experiencing distress related to technology use, consult a qualified professional.
+
+                ## 11. User responsibility for emergency/essential access
+                You are responsible for ensuring that blocking rules do not interfere with your access to emergency services, essential communication, or any app you require for safety-critical purposes. Orlune's essential-app allow list exists for this purpose — configuring it correctly for your own needs is your responsibility.
+
+                ## 12. Local data responsibility
+                Because all Orlune data is stored only on your device, you are responsible for its safekeeping — including using "Export local data" if you want a backup before uninstalling, switching devices, or deleting all data. [LEGAL ENTITY NAME — TBD] has no copy to restore for you.
+
+                ## 13. Intellectual property
+                Orlune's source code, design, and branding are the property of [LEGAL ENTITY NAME — TBD], except for the open-source components described below. See "Free / Open-Source Positioning" in "About Orlune" for the current licensing status of Orlune's own source code.
+
+                ## 14. Open-source components
+                Orlune incorporates open-source software under their own licenses — see "Open-Source Licenses" for the current list.
+
+                ## 15. Third-party applications and services
+                Orlune's core function involves observing and, when you configure it to, restricting access to other apps on your device. This does not create any relationship between you and those apps' publishers, and Orlune is not responsible for their behavior, content, or terms.
+
+                ## 16. Acceptable use
+                Do not use Orlune to monitor or restrict a device without the knowledge and consent of the person who primarily uses it, except where you have a legitimate legal basis to do so (for example, a parent configuring a device used by their own minor child, subject to applicable law). Do not attempt to reverse engineer, decompile, or redistribute Orlune except as permitted by its actual license (see "Open-Source Licenses" and "About Orlune").
+
+                ## 17. Modifications
+                [LEGAL ENTITY NAME — TBD] may update these Terms. Continued use of Orlune after an update constitutes acceptance of the revised Terms. Material changes will be reflected in "Legal document version / effective date."
+
+                ## 18. Suspension and termination
+                Because Orlune has no account system, there is no account to suspend. This license terminates automatically if you breach these Terms; upon termination, you must stop using the app and remove it from your devices.
+
+                ## 19. Disclaimer of warranties
+                Orlune is provided "as is" and "as available." To the maximum extent permitted by [JURISDICTION — TBD] law, [LEGAL ENTITY NAME — TBD] disclaims all warranties, express or implied, including merchantability, fitness for a particular purpose, and non-infringement.
+
+                ## 20. Limitation of liability
+                To the maximum extent permitted by law, [LEGAL ENTITY NAME — TBD] is not liable for indirect, incidental, special, or consequential damages arising from use of Orlune, including missed deadlines, lost productivity, or distress arising from blocking behavior working differently than expected.
+
+                ## 21. Indemnity
+                [Indemnification clause — pending legal review as to whether one is appropriate for a free, non-commercial local tool of this kind. LEGAL REVIEW REQUIRED — TBD]
+
+                ## 22. Governing law
+                These Terms are governed by the laws of [JURISDICTION — TBD], without regard to conflict-of-law principles, pending confirmation by legal counsel.
+
+                ## 23. Dispute resolution
+                [Dispute resolution mechanism — arbitration, small-claims carve-out, venue — not yet determined. LEGAL REVIEW REQUIRED — TBD]
+
+                ## 24. Severability
+                If any provision of these Terms is found unenforceable, the remaining provisions continue in full force and effect.
+
+                ## 25. Entire agreement
+                These Terms, together with the Privacy Policy and the End User License Agreement, constitute the entire agreement between you and [LEGAL ENTITY NAME — TBD] regarding Orlune, superseding any prior agreements on the same subject.
+
+                ## 26. Contact
+                [CONTACT EMAIL — TBD]
+
+                ## 27. Effective date
+                Not yet effective — no version of these Terms has been published.
+
+                ## 28. Version
+                Document set version 0.2.0-draft, matching app version 0.1.0.
             """.trimIndent()
         ),
         LegalDocument(
@@ -107,7 +223,7 @@ object LegalDocuments {
                 You may not: reverse engineer, decompile, or disassemble the app except to the extent applicable law expressly permits; redistribute, sell, rent, or sublicense the app; remove or alter any proprietary notices; or use the app to build a competing product.
 
                 ## Ownership
-                Orlune, including its source code, design, and branding, is and remains the property of [LEGAL ENTITY NAME — TBD]. This Agreement does not transfer any ownership rights to you.
+                Orlune, including its source code, design, and branding, is and remains the property of [LEGAL ENTITY NAME — TBD]. This Agreement does not transfer any ownership rights to you. See "About Orlune" for the current, undecided status of Orlune's own source-code license — this EULA governs the compiled app you install; it does not by itself make any claim about whether Orlune's source is or is not open source.
 
                 ## Open-source components
                 Orlune incorporates open-source software components under their own licenses. See "Open-Source Licenses" for the full list.
@@ -141,6 +257,9 @@ object LegalDocuments {
 
                 ### Foreground service (FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE)
                 Required by Android for the background service that watches for rule/schedule/focus-session triggers while the app isn't in the foreground. Not a user-facing permission — it is declared automatically, not requested through a dialog.
+
+                ## App picker visibility (not a runtime permission)
+                The app picker (used when choosing which apps a rule or focus session applies to) reads the list of installed, launchable apps using Android's scoped `<queries>` declaration — not the broader `QUERY_ALL_PACKAGES` permission, and not a user-facing grant of any kind. Full technical and policy detail is in `docs/app-visibility-compliance.md` in the source repository.
 
                 ## Permissions Orlune does NOT request
                 No INTERNET permission (no network access is even possible). No location, camera, microphone, contacts, SMS, call log, storage-wide access, or QUERY_ALL_PACKAGES. No AccessibilityService — Orlune does not currently use or request accessibility services (see "Security Statement" for what this means for blocking reliability).
@@ -210,6 +329,7 @@ object LegalDocuments {
                 - Cloud backup and device-transfer of Orlune's data is explicitly disabled
                 - Standard Android app sandboxing isolates Orlune's private storage from other apps without root access
                 - No third-party SDK is bundled beyond standard AndroidX/Jetpack libraries and Kotlin coroutines — see "Third-Party Notices"
+                - App visibility for the app picker uses Android's scoped `<queries>` mechanism, not the broader `QUERY_ALL_PACKAGES` permission — see `docs/app-visibility-compliance.md`
 
                 ## What this does not cover
                 - A rooted or compromised device, or physical access to a device someone has already unlocked, is outside what any app-level security model can protect against
@@ -242,49 +362,13 @@ object LegalDocuments {
             """.trimIndent()
         ),
         LegalDocument(
-            id = "open-source-licenses",
-            listTitle = "Open-Source Licenses",
-            body = """
-                # Open-Source Licenses
-
-                ## Status
-                This is a manually-maintained summary, not an automatically generated license report. Before commercial release, this list should be regenerated from the actual dependency tree to guarantee completeness and exact version/license accuracy.
-
-                ## Major open-source components as of this document's effective date
-                - Kotlin and Kotlin Coroutines — Apache License 2.0 — JetBrains / Kotlin Foundation
-                - AndroidX Jetpack libraries (Core, Lifecycle, Activity, Compose UI, Compose Material 3, Room, WorkManager) — Apache License 2.0 — The Android Open Source Project
-                - Material Components icon set (material-icons-extended) — Apache License 2.0 — Google
-
-                Orlune adds no dependency outside the AndroidX/Jetpack and Kotlin ecosystems.
-
-                ## Full license texts
-                Full license texts for the above are the standard Apache License, Version 2.0. This document intentionally does not reproduce the full license text inline; a future version may bundle it or link to an in-app licenses viewer generated from the build.
-            """.trimIndent()
-        ),
-        LegalDocument(
-            id = "third-party-notices",
-            listTitle = "Third-Party Notices",
-            body = """
-                # Third-Party Notices
-
-                ## No third-party services
-                Orlune integrates no third-party service, SDK, or API that receives data from your device — no analytics platform, no crash reporter, no advertising network, no cloud storage provider, no AI/ML API. This is enforced structurally: the app requests no INTERNET permission, so no such integration could function even if added by mistake.
-
-                ## Third-party code
-                The only third-party code in Orlune is the open-source libraries listed in "Open-Source Licenses" — none of which transmit data off-device as configured in this app; they are used purely as local, on-device libraries (UI framework, local database, background task scheduling).
-
-                ## Trademarks
-                Any third-party trademarks that may appear in Orlune (for example, "Android," or the names of apps shown in your own usage data) belong to their respective owners and are used only descriptively, to identify the apps you have installed — not to imply endorsement or affiliation.
-            """.trimIndent()
-        ),
-        LegalDocument(
             id = "wellness-disclaimer",
             listTitle = "Wellness / Product Disclaimer",
             body = """
                 # Wellness / Product Disclaimer
 
                 ## Not a medical or therapeutic product
-                Orlune is a self-directed screen-time tool, not a medical device, therapeutic product, or mental-health treatment. It is not a substitute for professional advice regarding addiction, mental health, or behavioral concerns. If you are experiencing distress related to technology use, please consult a qualified professional.
+                Orlune is a self-directed screen-time tool, designed to support more intentional digital habits. It is not a medical device, therapeutic product, or mental-health treatment, and is not a substitute for professional advice regarding addiction, mental health, or behavioral concerns. Orlune does not claim to cure, treat, diagnose, or prevent addiction, ADHD, anxiety, depression, or any other medical or mental-health condition, and does not claim to medically improve sleep or change brain function. If you are experiencing distress related to technology use, please consult a qualified professional.
 
                 ## Blocking is not guaranteed or unbreakable
                 Orlune's app-blocking relies on Android's SYSTEM_ALERT_WINDOW overlay mechanism, checked periodically (currently roughly every few seconds) by a background service — not real-time, kernel-level enforcement. As a result:
@@ -306,18 +390,57 @@ object LegalDocuments {
                 # Children & Teen Privacy
 
                 ## Status
-                Draft. Orlune's target audience, age rating, and any child-directed-service determination (for example, under COPPA in the United States, or equivalent rules elsewhere) have not yet been finalized as of this document's effective date. This section must be completed with legal input before release, particularly given Orlune's screen-time/parental-interest subject matter.
+                Draft. Orlune's target audience, age rating, and any child-directed-service determination — under India's DPDP Act Section 9, the US's COPPA, or equivalent rules elsewhere — have not yet been finalized as of this document's effective date. This section must be completed with legal input before release, particularly given Orlune's screen-time/parental-interest subject matter. See `docs/legal-compliance-matrix.md` for the current, per-jurisdiction open questions.
 
                 ## Current design-level facts relevant to this determination
                 Orlune has no account system and collects no directly-identifying information (name, email, birthdate) at any point, from any user, of any age — because it has no account system at all. All processing described in "Data Collection & Permissions" happens locally regardless of who is using the device.
 
                 ## What is not yet decided
                 - Whether Orlune will be marketed or positioned as suitable for use on a device primarily used by a child or teen
-                - Whether a specific children's-privacy compliance statement is required, and if so, its content
+                - Whether a specific children's-privacy compliance statement is required under any applicable law, and if so, its content
                 - The app's eventual Google Play content rating
 
                 ## Placeholder statement
-                Until the above is finalized, Orlune should not be represented as verified-compliant with any children's privacy law. [LEGAL REVIEW REQUIRED — TBD]
+                Until the above is finalized, Orlune should not be represented as verified-compliant with any children's privacy law, in any jurisdiction. [LEGAL REVIEW REQUIRED — TBD]
+            """.trimIndent()
+        ),
+        LegalDocument(
+            id = "open-source-licenses",
+            listTitle = "Open-Source Licenses",
+            body = """
+                # Open-Source Licenses
+
+                ## Status
+                This is a manually-maintained summary, not an automatically generated license report. Before commercial release, this list should be regenerated from the actual dependency tree to guarantee completeness and exact version/license accuracy.
+
+                ## Third-party components Orlune uses
+                - Kotlin and Kotlin Coroutines — Apache License 2.0 — JetBrains / Kotlin Foundation
+                - AndroidX Jetpack libraries (Core, Lifecycle, Activity, Compose UI, Compose Material 3, Room, WorkManager) — Apache License 2.0 — The Android Open Source Project
+                - Material Components icon set (material-icons-extended) — Apache License 2.0 — Google
+
+                Orlune adds no dependency outside the AndroidX/Jetpack and Kotlin ecosystems.
+
+                ## Orlune's own source code license
+                This section is about the licenses Orlune *uses*. Whether Orlune's own source code is released under an open-source license is a separate question, covered in "About Orlune" — as of this document's effective date, no LICENSE file exists in the source repository and no open-source license has been chosen. Do not describe Orlune itself as "open source" until that changes.
+
+                ## Full license texts
+                Full license texts for the above are the standard Apache License, Version 2.0. This document intentionally does not reproduce the full license text inline; a future version may bundle it or link to an in-app licenses viewer generated from the build.
+            """.trimIndent()
+        ),
+        LegalDocument(
+            id = "third-party-notices",
+            listTitle = "Third-Party Notices",
+            body = """
+                # Third-Party Notices
+
+                ## No third-party services
+                Orlune integrates no third-party service, SDK, or API that receives data from your device — no analytics platform, no crash reporter, no advertising network, no cloud storage provider, no AI/ML API. This is enforced structurally: the app requests no INTERNET permission, so no such integration could function even if added by mistake.
+
+                ## Third-party code
+                The only third-party code in Orlune is the open-source libraries listed in "Open-Source Licenses" — none of which transmit data off-device as configured in this app; they are used purely as local, on-device libraries (UI framework, local database, background task scheduling).
+
+                ## Trademarks
+                Any third-party trademarks that may appear in Orlune (for example, "Android," or the names of apps shown in your own usage data via the app picker) belong to their respective owners and are used only descriptively, to identify apps you have installed and chosen to include — not to imply endorsement, affiliation, or sponsorship by those trademark owners.
             """.trimIndent()
         ),
         LegalDocument(
@@ -333,7 +456,7 @@ object LegalDocuments {
                 Because Orlune stores all data locally on your device and never sends a copy anywhere, most "access/export/delete my data" requests are things you can already do yourself in the Privacy Center — Export Data and Delete All Data act immediately, with nothing held back on any server. For any question this doesn't answer, contact [CONTACT EMAIL — TBD].
 
                 ## Grievance officer / regional contact requirements
-                Some jurisdictions (for example, India's IT Rules, or the EU's GDPR) require a named grievance officer or regional representative with published contact details. This has not yet been designated: [LEGAL ENTITY NAME — TBD] / [GRIEVANCE OFFICER NAME — TBD] / [GRIEVANCE OFFICER CONTACT — TBD].
+                Some jurisdictions (for example, India's IT Rules and DPDP Act, or the EU's GDPR) require a named grievance officer or regional representative with published contact details. This has not yet been designated: [LEGAL ENTITY NAME — TBD] / [GRIEVANCE OFFICER NAME — TBD] / [GRIEVANCE OFFICER CONTACT — TBD].
 
                 ## Response time
                 A committed response-time SLA has not yet been established. [RESPONSE TIME COMMITMENT — TBD]
@@ -346,19 +469,34 @@ object LegalDocuments {
                 # About Orlune
 
                 ## What Orlune is
-                Orlune is a free, local-only, no-account Android digital wellbeing app. It helps you understand your own screen time and reduce distracting app usage, entirely on your device — no server, no account, no ads, no analytics, no AI.
+                Orlune is a local digital-wellbeing tool designed to help you use your time more intentionally — free, local-only, no account, no ads, no analytics, no AI.
 
-                ## Current version
+                ## Version and build
                 App version 0.1.0 (versionCode 1) — pre-release, under active development. Not yet published to Google Play.
 
+                ## License
+                No LICENSE file currently exists in Orlune's source repository, and no open-source license has been selected. Orlune is not currently released under any recognized open-source license — do not describe it as "open source" until a license is actually chosen and published. If Orlune is released under an open-source license in the future, this section will name it precisely, and the Terms of Service will be reviewed for consistency with it.
+
+                ## Privacy model
+                No account, no login, no cloud, no backend server, no AI, no advertising SDK, no analytics SDK, no behavioral tracking. Usage information is processed entirely on your device. Full detail is in the Privacy Policy and the rest of this Legal Center.
+
+                ## Open-source information
+                Orlune itself is not (yet) open source — see "License" above. It does use open-source third-party components; see "Open-Source Licenses" for the full list.
+
+                ## Legal documents
+                All 15 documents in this Legal Center, including this one, are development-time drafts — see "Legal document version / effective date."
+
                 ## What's implemented today
-                Usage monitoring, deterministic limit/schedule rule enforcement, app blocking via an overlay, one-time focus sessions, local JSON export, and delete-all-data controls, across System/Light/Dark appearance modes.
+                Usage monitoring, deterministic limit/schedule rule enforcement with a native app picker, app blocking via an overlay, one-time focus sessions, local JSON export, and delete-all-data controls, across System/Light/Dark appearance modes.
 
                 ## What's intentionally not built yet
-                Website/VPN blocking, Android's AccessibilityService-based detection, a dedicated onboarding flow, recurring focus-session scheduling, and any analytics, recommendation, or AI/ML feature — all deliberately deferred, not overlooked.
+                Website/VPN blocking, Android's AccessibilityService-based detection, onboarding flow, recurring focus-session scheduling, and any analytics, recommendation, or AI/ML feature — all deliberately deferred, not overlooked.
 
-                ## Original work
+                ## Acknowledgements
                 Orlune is built from original design, code, and branding. It shares no code, design, or algorithms with any other digital-wellbeing app.
+
+                ## Third-party licenses
+                See "Open-Source Licenses" and "Third-Party Notices."
             """.trimIndent()
         ),
         LegalDocument(
@@ -371,13 +509,14 @@ object LegalDocuments {
                 Every document in this Legal Center is a draft prepared during development, for internal review — not a finalized, lawyer-reviewed, or published legal document. None of them should be treated as binding until reviewed by qualified legal counsel and formally published with a real effective date.
 
                 ## Version
-                Document set version: 0.1.0-draft
+                Document set version: 0.2.0-draft
                 Matches app version: 0.1.0 (versionCode 1)
 
                 ## Effective date
                 Not yet effective — no version of these documents has been published. This line will be replaced with a real date once these documents are reviewed and Orlune is released.
 
                 ## Change history
+                - 0.2.0-draft — expanded Privacy Policy (23 sections) and Terms of Service (28 sections) to their full requested structure; added app-picker/package-visibility disclosure throughout; clarified Orlune's own source-code license status as undecided (not open source); cross-referenced docs/legal-compliance-matrix.md and docs/google-play-privacy-compliance.md.
                 - 0.1.0-draft — initial draft of all 15 documents, written to accurately describe the app's actual local-only implementation as of app version 0.1.0.
             """.trimIndent()
         )

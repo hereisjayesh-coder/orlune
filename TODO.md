@@ -1,5 +1,61 @@
 # Orlune — TODO
 
+## App picker, legal documentation, and launcher icon — 2026-08-17
+
+- [x] Native app picker (`feature/apppicker/AppPickerScreen.kt`) replaced all raw
+      package-name text/CSV input in Limits and Focus: real app icons and labels,
+      search, "Frequently used today" (from real Insights usage data), alphabetical
+      "All apps", single-select (Limits, matching `RuleEntity`'s one-package design)
+      and multi-select (Focus) modes. Package names are never shown to the user.
+- [x] `InstalledAppLister`/`InstalledAppSource` (`platform/usage/`) enumerate
+      launchable apps via the existing `<queries>`/`CATEGORY_LAUNCHER` declaration —
+      **not** `QUERY_ALL_PACKAGES`, confirmed against current Google Play policy
+      research (digital-wellbeing apps are not on Google's permitted-use list for
+      broad package visibility). See `docs/app-visibility-compliance.md`.
+- [x] `LimitsSection`/`FocusSection` (new) own each feature's app-picker sub-navigation
+      as a manual back-stack, matching `SettingsSection`'s established pattern.
+      **Real bug caught and fixed during this work**: the first version passed raw
+      `data object`/`data class` destinations as `SaveableStateHolder.SaveableStateProvider`
+      keys, which crashed on launch (`IllegalArgumentException: Type of the key Root
+      is not supported`) — `SaveableStateProvider` keys must be Bundle-storable.
+      Fixed by using `.toString()` keys across all three Section files.
+- [x] Launcher icon implemented from `design/orlune-logo-reference.png` (the
+      user-approved concept #4 reference, added to the repo this session): the
+      gold/gray split-ring clock mark extracted via flood-fill background removal
+      (a simple brightness threshold couldn't distinguish the mark's dark-gray half
+      from the reference's card border/grain texture), shipped as raster adaptive-icon
+      foreground + monochrome layers at all 5 density buckets — not hand-vectorized,
+      to avoid drifting from the approved reference. `ic_launcher_background` changed
+      to `#000000` to exactly match the reference.
+- [x] Privacy & Legal Center expanded: Privacy Policy (23 sections) and Terms of
+      Service (28 sections) rewritten to the full requested structure, informed by
+      this session's research into India's DPDP Act 2023/Rules 2025, GDPR/UK GDPR,
+      CCPA/CPRA, COPPA, and current Google Play Data Safety policy. All 15 documents
+      cross-reference the new compliance docs. No legal entity/address/contact was
+      invented — all business/legal unknowns remain explicit `[TBD]` placeholders.
+      **Real rendering bug caught and fixed**: a markdown table in the Privacy Policy
+      draft would have rendered as broken literal pipe-text, since the in-app markdown
+      subset doesn't support tables — replaced with a bullet list.
+- [x] New compliance docs: `docs/app-visibility-compliance.md`,
+      `docs/legal-compliance-matrix.md` (jurisdiction/law/requirement/implementation/
+      open-issue table), `docs/google-play-privacy-compliance.md`.
+- [x] "About Orlune" is now directly reachable from Settings root (not just nested in
+      the Legal Center list), showing real branding (the actual launcher icon mark),
+      version/build, and an explicit "not open source — no LICENSE file exists"
+      statement (checked against the actual repository, not assumed).
+- [x] New tests: `DailyLimitInputTest` (already existed, unchanged), `LegalDocumentsTest`
+      (routing/data-integrity, 7 tests), `ThemePreferenceDaoInstrumentedTest`
+      (persistence round-trip, 4 tests), `InstalledAppListerInstrumentedTest`
+      (package→label, package→icon, exclusion, sorting, dedup, 5 tests).
+- [x] Verified on the Pixel 7a: full app-picker flow (search, multi-select with
+      remove, single-select instant-return, end-to-end rule creation with real label
+      resolution in "Active rules"), launcher icon in the app drawer and App Info
+      page, About Orlune, System/Light/Dark theme switching on the Legal Center,
+      and a full process force-stop + relaunch (state and theme survived). Clean
+      logcat throughout — no `FATAL EXCEPTION` in the final, fixed build.
+- [x] Zero manifest or dependency changes this session — confirmed via `git diff`
+      before commit: no `INTERNET` permission, no new library of any kind.
+
 ## Current takeover checkpoint — 2026-08-16
 - [x] Replaced the launch surface with a black-first Compose shell: Home, Focus,
       Limits, Insights, and Settings, backed by the existing repositories.
