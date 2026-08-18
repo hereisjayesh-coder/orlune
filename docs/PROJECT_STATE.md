@@ -1,12 +1,113 @@
 # Orlune — Project State
 
-**Last verification date:** 2026-08-18 (workspace migration/backup session — see
-"Workspace migration" section below. No product feature work was done. The
-2026-08-17 first-launch onboarding entry below is otherwise unchanged and describes
-real prior work; only its "not yet committed" claim is now stale — see the corrected
-commit note immediately below.)
+**Last verification date:** 2026-08-19 (release-hardening session — see "Release
+hardening" section below, the current authoritative status). The 2026-08-18 and
+2026-08-17 entries below are unchanged and describe real prior work.
 
-**Latest verified commit:** `47ef5cc` ("chore: checkpoint before workspace
+**Latest verified commit:** `c19e3ec` ("build: enable R8 minification and resource
+shrinking for release"), pushed to and matching `origin/main`. See "Release
+hardening" below for the full chain back through `9f75145` and `4967f3a`.
+
+---
+
+## Release hardening (2026-08-19)
+
+Full regression + release-readiness pass, physical Pixel 7a. Found and fixed one
+real crash; found no other defects.
+
+**Uncommitted work found at session start**: a batch of block-screen/Insights/Focus
+work (BlockReason display, 4-week Insights, Focus quick-launch from the block
+screen, `InstalledAppLister` icon cache) was sitting uncommitted in the working tree,
+undocumented anywhere. Verified (`assembleDebug` + `testDebugUnitTest`, 233/233)
+before committing as `4967f3a` — see that commit message for the full feature list.
+Not the "performance optimization work" the session's kickoff prompt assumed existed;
+no such prior work was found. Treat this as a lesson: always `git status` for
+uncommitted work before trusting a prompt's premise about what's already done.
+
+**Phase A — regression**: `assembleDebug`/`testDebugUnitTest` (233/233 unit,
+up from 195)/`connectedDebugAndroidTest` (33/33 instrumentation, up from 30) all
+pass. Full manual walkthrough on the Pixel 7a of every item in the standard
+checklist (fresh launch, 11-screen onboarding including the Privacy-screen Legal
+Center side-trip and a real permission grant, app picker, daily + custom limits,
+a recurring schedule, Focus with quiet mode — confirmed via the real DND status-bar
+icon, blocking with the new BlockReason-driven overlay text, Continue/snooze,
+Insights 7-day and the new 4-week view, Settings, Feedback [opens Gmail compose,
+correctly pre-filled, discarded without sending], Export [correctly opens the
+Android share sheet, dismissed without sharing], Light/Dark/System theming, a real
+force-stop + relaunch, and Usage Access revoke/restore) — all correct, all fail-safe,
+no crashes.
+
+**One real bug found and fixed** (`9f75145`): Settings → "Delete all local data"
+(and the equivalent Privacy Center "Reset Orlune" flow) crashed every single time —
+`IllegalStateException: Cannot access database on the main thread`.
+`OrluneRoot.kt`'s `rememberCoroutineScope()` launches on the main/UI dispatcher, and
+`RoomDatabase.clearAllTables()` is synchronous; nothing wrapped it in
+`Dispatchers.IO`. This is exactly the kind of defect the "do not claim release
+readiness without actually verifying" rule exists to catch — it would not have been
+found by unit or instrumentation tests, only by tapping the actual button on a real
+device. Fixed by wrapping both call sites in `withContext(Dispatchers.IO) { ... }`;
+re-verified on-device (delete now completes cleanly, returns to fresh-install
+onboarding state) and re-verified again under the R8-minified release build below.
+
+**Phase B — release build**: `versionCode = 1`, `versionName = "0.1.0"`, `minSdk =
+29`, `targetSdk = 36`, `compileSdk = 37`. No release signing key exists yet (none
+committed, none generated this session — see "Legal/business items" below for why).
+R8 minification + resource shrinking (`c19e3ec`) verified safe and enabled: built a
+debug-signed release-equivalent variant, ran the full on-device pass above against
+it (onboarding, Room reads/writes, the blocking overlay, quiet mode, and — most
+importantly — the just-fixed delete-all-data flow) with zero crashes or
+missing-class/resource failures, using only the default AndroidX/Compose/Room/
+WorkManager consumer ProGuard rules (`app/proguard-rules.pro` itself stays empty).
+Release APK: **3.0 MB**.
+
+**Phase C — performance** (release build, Pixel 7a): cold startup **136 ms**
+(`am start -W` TotalTime); idle PSS **~67 MB**, PSS with `BlockingMonitorService`
+actively monitoring (backgrounded) **~74 MB**; monitoring CPU is a brief spike per
+3-second tick, not continuous — sampled ~0.34s of CPU time over a 10s window while
+backgrounded (~3.4% average, not a busy-loop); the service correctly stops itself
+when no rule/session needs it (confirmed no `ServiceRecord` present with zero rules).
+No excessive DB query pattern observed; no redundant background work found beyond
+the documented 3s poll design.
+
+**Phase D — security/privacy**: merged release manifest re-checked directly —
+**no `INTERNET` permission**, confirmed. Full permission list matches
+`docs/google-play-privacy-compliance.md` exactly, plus WorkManager's transitive
+`WAKE_LOCK`/`ACCESS_NETWORK_STATE`/`RECEIVE_BOOT_COMPLETED` (none enable outbound
+networking). No analytics/ads/crash-reporter/tracking dependency anywhere in
+`gradle/libs.versions.toml`. No hardcoded URL/endpoint anywhere in `app/src/main`
+outside legal-document prose describing the *absence* of network calls. Backup/
+export behavior matches docs (`allowBackup=false`, empty `data_extraction_rules.xml`,
+user-initiated share-sheet JSON export only).
+
+**Phase E — database/migration**: schema at **v5**, all four migrations
+(`MIGRATION_1_2` through `MIGRATION_4_5`) wired via `OrluneApplication`, never
+`fallbackToDestructiveMigration()`. All four have a dedicated
+`OrluneDatabaseMigrationTest` case, all passing in this session's instrumentation
+run. Data survival across a real reinstall independently confirmed on-device
+(`adb install -r`: 4 rules, all settings intact afterward).
+
+**Phase F — versioning**: `versionCode`/`versionName` unchanged this session
+(still `1` / `"0.1.0"`) — bumping to 1.0.0 is a release decision for the user, not
+made unprompted. **`docs/CHANGELOG.md` does not exist** — a gap, not created this
+session (writing an accurate one requires enumerating real history, better done
+deliberately than rushed). No `docs/RELEASE_PROCESS.md` exists either.
+
+**Phase G — Play Store prep**: launcher icon (adaptive, all densities, monochrome
+layer) exists and is correct. **No feature graphic, no screenshots, no store
+listing copy, no hosted privacy-policy URL exist anywhere in this repo** — all
+real gaps, consistent with what `docs/google-play-privacy-compliance.md` already
+flagged. Data Safety form has not been filled in Play Console (can't be, from
+here). Content rating and target-audience declarations are undecided.
+
+**Legal/business items requiring human review before any release** (unchanged,
+carried forward from `docs/legal-compliance-matrix.md`): every "Legal review
+required" row in that matrix; the Privacy Policy/Terms' `[TBD]` legal-entity/
+address/contact placeholders; no privacy-policy URL is hosted anywhere, which
+independently blocks Play submission; a real release signing key must be generated
+and secured (never by an agent unprompted — losing it or mismanaging it is
+permanent for future updates) before any signed release build can exist.
+
+---
 migration"), pushed to and matching `origin/main`, on top of `fa1336e` ("feat: add
 first-launch onboarding" — the 2026-08-17 work described below, which **is now
 committed**, correcting that entry's "not yet committed" claim). `47ef5cc` itself
