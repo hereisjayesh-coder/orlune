@@ -73,6 +73,7 @@ fun FocusSection(
         FocusDestination.Root -> saveableStateHolder.SaveableStateProvider(FocusDestination.Root.toString()) {
             FocusScreen(
                 modifier = modifier,
+                installedAppSource = installedAppSource,
                 selectedApps = selectedApps,
                 minutesText = minutesText,
                 onMinutesChange = { minutesText = it },

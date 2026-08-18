@@ -48,4 +48,19 @@ object OrluneMigrations {
             )
         }
     }
+
+    /**
+     * Adds the rule-snooze table (block-screen "Continue +10/+30/Custom min"). A new
+     * table, not an altered one — every existing rule, schedule, and focus session is
+     * completely untouched. No row exists here until a user actually snoozes a block
+     * for the first time; the table starts empty on every upgrade path, exactly like a
+     * fresh install.
+     */
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `rule_snoozes` (`packageName` TEXT NOT NULL, `snoozedUntil` INTEGER NOT NULL, PRIMARY KEY(`packageName`))"
+            )
+        }
+    }
 }

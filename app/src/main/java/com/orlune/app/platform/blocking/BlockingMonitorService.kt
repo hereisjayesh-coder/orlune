@@ -48,7 +48,14 @@ class BlockingMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        overlayController = BlockOverlayController(this)
+        overlayController = BlockOverlayController(
+            context = this,
+            onSnooze = { packageName, minutes ->
+                scope.launch {
+                    (application as OrluneApplication).ruleRepository.snooze(packageName, minutes)
+                }
+            }
+        )
         createNotificationChannel()
     }
 
@@ -122,7 +129,7 @@ class BlockingMonitorService : Service() {
                 outcome.decision == BlockDecision.BLOCK && packageName != null -> {
                     val label = app.database.appDao().get(packageName)?.label ?: packageName
                     // WindowManager.addView/removeView require a thread with a Looper.
-                    withContext(Dispatchers.Main) { overlayController.show(label) }
+                    withContext(Dispatchers.Main) { overlayController.show(packageName, label) }
                 }
                 else -> withContext(Dispatchers.Main) { overlayController.hide() }
             }

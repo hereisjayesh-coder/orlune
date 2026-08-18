@@ -21,19 +21,32 @@ import com.orlune.app.MainActivity
  * `SavedStateRegistryOwner`/`ViewModelStoreOwner`, real complexity this phase doesn't
  * need. Every entry point is fail-safe: a missing overlay permission or a
  * `WindowManager` failure results in "no overlay shown," never a crash.
+ *
+ * [onSnooze] is the only side effect a snooze button has: it just reports "the user
+ * wants [packageName] allowed for N more minutes" to the caller — this class never
+ * touches Room or the blocking decision itself (see
+ * [com.orlune.app.data.repository.RuleRepository.snooze] /
+ * [com.orlune.app.data.repository.BlockingRepository] for where that actually happens).
+ * The overlay hides itself immediately after a snooze tap rather than waiting for the
+ * next monitor tick (up to [BlockingMonitorService]'s poll interval later) to notice
+ * the decision flipped to ALLOW — a few seconds of stale overlay wouldn't feel like a
+ * real button press.
  */
-class BlockOverlayController(private val context: Context) {
+class BlockOverlayController(
+    private val context: Context,
+    private val onSnooze: (packageName: String, minutes: Int) -> Unit
+) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var overlayView: View? = null
 
     fun isShowing(): Boolean = overlayView != null
 
-    fun show(blockedAppLabel: String) {
+    fun show(packageName: String, blockedAppLabel: String) {
         if (overlayView != null) return
         if (!OverlayPermission.isGranted(context)) return
 
-        val view = buildOverlayView(blockedAppLabel)
+        val view = buildOverlayView(packageName, blockedAppLabel)
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -61,9 +74,14 @@ class BlockOverlayController(private val context: Context) {
         }
     }
 
-    private fun buildOverlayView(blockedAppLabel: String): View {
+    private fun buildOverlayView(packageName: String, blockedAppLabel: String): View {
         val root = FrameLayout(context).apply {
             setBackgroundColor(Color.BLACK)
+            // This overlay manages its own explicit black/white colors deliberately —
+            // opt this whole hierarchy out of the platform's Force Dark remapping
+            // (available since API 29, this app's minSdk) so a future system-theme
+            // change can't alter colors on a window that isn't backed by an app theme.
+            isForceDarkAllowed = false
         }
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -78,9 +96,29 @@ class BlockOverlayController(private val context: Context) {
                 setPadding(48, 0, 48, 48)
             }
         )
+
+        content.addView(
+            LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                addView(Button(context).apply {
+                    text = "+10 min"
+                    setOnClickListener { onSnooze(packageName, 10); hide() }
+                })
+                addView(horizontalSpacer())
+                addView(Button(context).apply {
+                    text = "+30 min"
+                    setOnClickListener { onSnooze(packageName, 30); hide() }
+                })
+            }
+        )
+
+        content.addView(buildCustomSnoozeRow(packageName))
+
+        content.addView(verticalSpacer())
         content.addView(
             Button(context).apply {
-                text = "Go to Orlune"
+                text = "Leave"
                 setOnClickListener {
                     val intent = Intent(context, MainActivity::class.java).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -89,6 +127,7 @@ class BlockOverlayController(private val context: Context) {
                 }
             }
         )
+
         root.addView(
             content,
             FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER)
@@ -96,7 +135,59 @@ class BlockOverlayController(private val context: Context) {
         return root
     }
 
+    /** No free-text entry (same reasoning as [com.orlune.app.ui.components.IntStepper]):
+     * a bounded +/- stepper around a default, confirmed with its own "Snooze" button. */
+    private fun buildCustomSnoozeRow(packageName: String): View {
+        var customMinutes = DEFAULT_CUSTOM_SNOOZE_MINUTES
+        val valueView = TextView(context).apply {
+            text = "$customMinutes min"
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(24, 0, 24, 0)
+        }
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, 24, 0, 0)
+            addView(Button(context).apply {
+                text = "-"
+                setOnClickListener {
+                    customMinutes = (customMinutes - CUSTOM_SNOOZE_STEP_MINUTES).coerceAtLeast(MIN_CUSTOM_SNOOZE_MINUTES)
+                    valueView.text = "$customMinutes min"
+                }
+            })
+            addView(valueView)
+            addView(Button(context).apply {
+                text = "+"
+                setOnClickListener {
+                    customMinutes = (customMinutes + CUSTOM_SNOOZE_STEP_MINUTES).coerceAtMost(MAX_CUSTOM_SNOOZE_MINUTES)
+                    valueView.text = "$customMinutes min"
+                }
+            })
+            addView(Button(context).apply {
+                text = "Snooze"
+                setOnClickListener {
+                    onSnooze(packageName, customMinutes)
+                    hide()
+                }
+            })
+        }
+    }
+
+    private fun horizontalSpacer(): View = View(context).apply {
+        layoutParams = LinearLayout.LayoutParams(32, 0)
+    }
+
+    private fun verticalSpacer(): View = View(context).apply {
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 32)
+    }
+
     private companion object {
         private const val TAG = "BlockOverlay"
+        private const val DEFAULT_CUSTOM_SNOOZE_MINUTES = 15
+        private const val CUSTOM_SNOOZE_STEP_MINUTES = 5
+        private const val MIN_CUSTOM_SNOOZE_MINUTES = 5
+        private const val MAX_CUSTOM_SNOOZE_MINUTES = 120
     }
 }

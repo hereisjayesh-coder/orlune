@@ -3,8 +3,10 @@ package com.orlune.app.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -15,13 +17,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.orlune.app.core.domain.focus.FocusSessionEngine
 import com.orlune.app.data.local.entity.FocusSessionEntity
+import com.orlune.app.platform.usage.AppDisplayInfo
 
+/** [blockedAppDisplay] must already be resolved via [rememberAppDisplayInfos] — never
+ * shows a raw package name, matching [AppUsageRow]'s contract. */
 @Composable
-fun SessionLine(session: FocusSessionEntity) {
+fun SessionLine(session: FocusSessionEntity, blockedAppDisplay: Map<String, AppDisplayInfo>) {
     val state = FocusSessionEngine.stateOf(session, System.currentTimeMillis())
+    val blockedPackages = FocusSessionEngine.blockedPackages(session)
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Text(state.name.lowercase().replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Medium)
-        Text("${formatDuration(session.completedMinutes * 60L)} of ${formatDuration(session.plannedMinutes * 60L)} · ${FocusSessionEngine.blockedPackages(session).joinToString()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            blockedPackages.forEach { packageName ->
+                AppIcon(blockedAppDisplay[packageName]?.icon)
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+        }
+        Text(
+            "${formatDuration(session.completedMinutes * 60L)} of ${formatDuration(session.plannedMinutes * 60L)} · " +
+                blockedPackages.joinToString { blockedAppDisplay[it]?.label ?: it },
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

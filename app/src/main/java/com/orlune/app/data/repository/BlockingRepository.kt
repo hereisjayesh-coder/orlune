@@ -11,6 +11,7 @@ import com.orlune.app.data.local.dao.AppListEntryDao
 import com.orlune.app.data.local.dao.DailyUsageDao
 import com.orlune.app.data.local.dao.FocusSessionDao
 import com.orlune.app.data.local.dao.RuleDao
+import com.orlune.app.data.local.dao.RuleSnoozeDao
 import com.orlune.app.data.local.dao.ScheduleDao
 import com.orlune.app.data.local.dao.SessionDao
 import com.orlune.app.data.local.entity.RuleEntity
@@ -51,6 +52,7 @@ class BlockingRepository(
     private val dailyUsageDao: DailyUsageDao,
     private val sessionDao: SessionDao,
     private val focusSessionDao: FocusSessionDao,
+    private val ruleSnoozeDao: RuleSnoozeDao,
     private val ownPackageName: String,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val nowMillis: () -> Long = System::currentTimeMillis
@@ -82,7 +84,20 @@ class BlockingRepository(
         val listEntries = appListEntryDao.observeByType("block").first() +
             appListEntryDao.observeByType("allow").first()
 
-        return Outcome(packageName, BlockingEngine.decide(packageName, listEntries, anyTriggered))
+        val decision = BlockingEngine.decide(packageName, listEntries, anyTriggered)
+        // A snooze overrides the final decision, not any input into it — it never
+        // edits/disables the triggering rule/schedule/focus session, and it sits
+        // "outside" BlockingEngine (unmodified) the same way this whole repository
+        // already layers focus-session evaluation on top of the engine.
+        if (decision == BlockDecision.BLOCK && isSnoozed(packageName)) {
+            return Outcome(packageName, BlockDecision.ALLOW)
+        }
+        return Outcome(packageName, decision)
+    }
+
+    private suspend fun isSnoozed(packageName: String): Boolean {
+        val snooze = ruleSnoozeDao.get(packageName) ?: return false
+        return nowMillis() < snooze.snoozedUntil
     }
 
     /**

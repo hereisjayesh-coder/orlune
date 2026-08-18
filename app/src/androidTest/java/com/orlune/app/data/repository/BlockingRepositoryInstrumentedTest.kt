@@ -10,6 +10,7 @@ import com.orlune.app.data.local.entity.AppListEntryEntity
 import com.orlune.app.data.local.entity.DailyUsageEntity
 import com.orlune.app.data.local.entity.FocusSessionEntity
 import com.orlune.app.data.local.entity.RuleEntity
+import com.orlune.app.data.local.entity.RuleSnoozeEntity
 import com.orlune.app.data.local.entity.ScheduleEntity
 import com.orlune.app.data.local.entity.SessionEntity
 import kotlinx.coroutines.test.runTest
@@ -65,6 +66,7 @@ class BlockingRepositoryInstrumentedTest {
             dailyUsageDao = database.dailyUsageDao(),
             sessionDao = database.sessionDao(),
             focusSessionDao = database.focusSessionDao(),
+            ruleSnoozeDao = database.ruleSnoozeDao(),
             ownPackageName = "com.orlune.app",
             zoneId = zone,
             nowMillis = { now }
@@ -182,5 +184,33 @@ class BlockingRepositoryInstrumentedTest {
         val outcome = repository("app.a", now).evaluate()
 
         assertEquals(BlockDecision.ALLOW, outcome.decision)
+    }
+
+    @Test
+    fun evaluate_aRealPersistedSnoozeOverridesARealTriggeredRule() = runTest {
+        val now = ts("2026-08-16T12:00:00")
+        database.dailyUsageDao().upsert(
+            DailyUsageEntity(packageName = "app.a", epochDay = epochDayOf(now), totalUsageSeconds = 4000, launchCount = 1, sessionCount = 1)
+        )
+        database.ruleDao().upsert(RuleEntity(type = "limit", targetPackageOrCategory = "app.a", threshold = 3600, windowDefinition = null))
+        database.ruleSnoozeDao().upsert(RuleSnoozeEntity(packageName = "app.a", snoozedUntil = now + 600_000))
+
+        val outcome = repository("app.a", now).evaluate()
+
+        assertEquals(BlockDecision.ALLOW, outcome.decision)
+    }
+
+    @Test
+    fun evaluate_anExpiredRealPersistedSnoozeNoLongerOverridesARealTriggeredRule() = runTest {
+        val now = ts("2026-08-16T12:00:00")
+        database.dailyUsageDao().upsert(
+            DailyUsageEntity(packageName = "app.a", epochDay = epochDayOf(now), totalUsageSeconds = 4000, launchCount = 1, sessionCount = 1)
+        )
+        database.ruleDao().upsert(RuleEntity(type = "limit", targetPackageOrCategory = "app.a", threshold = 3600, windowDefinition = null))
+        database.ruleSnoozeDao().upsert(RuleSnoozeEntity(packageName = "app.a", snoozedUntil = now - 1))
+
+        val outcome = repository("app.a", now).evaluate()
+
+        assertEquals(BlockDecision.BLOCK, outcome.decision)
     }
 }

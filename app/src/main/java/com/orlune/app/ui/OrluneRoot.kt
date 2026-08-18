@@ -31,8 +31,6 @@ import com.orlune.app.OrluneApplication
 import com.orlune.app.core.domain.focus.FocusNotificationPolicy
 import com.orlune.app.core.domain.focus.FocusSessionEngine
 import com.orlune.app.core.domain.focus.FocusSessionState
-import com.orlune.app.data.local.entity.RuleEntity
-import com.orlune.app.data.local.entity.ScheduleEntity
 import com.orlune.app.data.local.entity.ThemePreferenceEntity
 import com.orlune.app.data.privacy.LocalDataExporter
 import com.orlune.app.feature.focus.FocusSection
@@ -47,6 +45,7 @@ import com.orlune.app.platform.blocking.OverlayPermission
 import com.orlune.app.platform.feedback.FeedbackIntent
 import com.orlune.app.platform.notifications.NotificationPolicyAccessPermission
 import com.orlune.app.platform.usage.UsageAccessPermission
+import com.orlune.app.ui.components.orluneSafeAreaPadding
 import com.orlune.app.ui.navigation.OrluneTab
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -135,8 +134,11 @@ fun OrluneRoot(app: OrluneApplication) {
         // before this fix, since Surface is what actually establishes the correct
         // LocalContentColor for un-colored Text, not MaterialTheme alone.
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            // The Surface itself stays full-bleed (background color extends behind
+            // the status/nav bars, matching this app's edge-to-edge black-first
+            // look) — only the actual content is pushed clear of the system bars.
             OnboardingSection(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().orluneSafeAreaPadding(),
                 installedAppSource = app.installedAppLister,
                 ownPackageName = context.packageName,
                 todayUsageSecondsByPackage = todayUsageSecondsByPackage,
@@ -146,15 +148,28 @@ fun OrluneRoot(app: OrluneApplication) {
                 onOpenUsageAccessSettings = { context.startActivity(UsageAccessPermission.settingsIntent()) },
                 onOpenOverlaySettings = { context.startActivity(OverlayPermission.settingsIntent(context)) },
                 onOpenNotificationPolicySettings = { context.startActivity(NotificationPolicyAccessPermission.settingsIntent()) },
-                onAddLimitRule = { packageName, seconds ->
+                onComplete = { goals, customGoalText, focusNotificationPreference, dailyLimitPlan ->
+                    // Single coroutine, sequential: the rule(s) land in Room before
+                    // onboarding is marked complete, not as independent fire-and-forget
+                    // launches racing each other — see OnboardingDailyLimit's KDoc for
+                    // the bug this replaced (a duration could silently vanish).
                     scope.launch {
-                        app.database.ruleDao().upsert(
-                            RuleEntity(type = "limit", targetPackageOrCategory = packageName, threshold = seconds, windowDefinition = null)
-                        )
+                        if (dailyLimitPlan != null) {
+                            dailyLimitPlan.packages.forEach { packageName ->
+                                app.ruleRepository.addDailyLimit(packageName, dailyLimitPlan.thresholdSeconds)
+                            }
+                        }
+                        app.onboardingRepository.complete(goals, customGoalText, focusNotificationPreference)
+                        if (dailyLimitPlan != null) {
+                            // A rule was just created while the app is already running —
+                            // BlockingMonitorService only auto-starts at process cold
+                            // start (OrluneApplication.resumeMonitoringIfNeeded), so a
+                            // freshly-added rule needs this same explicit start the
+                            // Focus tab's onStart already does below, or it silently
+                            // wouldn't be enforced until the next full app restart.
+                            BlockingMonitorService.start(context)
+                        }
                     }
-                },
-                onComplete = { goals, customGoalText, focusNotificationPreference ->
-                    scope.launch { app.onboardingRepository.complete(goals, customGoalText, focusNotificationPreference) }
                 }
             )
         }
@@ -224,20 +239,20 @@ fun OrluneRoot(app: OrluneApplication) {
                     todayUsageSecondsByPackage = todayUsageSecondsByPackage,
                     onAddLimit = { packageName, seconds ->
                         scope.launch {
-                            app.database.ruleDao().upsert(
-                                RuleEntity(type = "limit", targetPackageOrCategory = packageName, threshold = seconds, windowDefinition = null)
-                            )
+                            app.ruleRepository.addDailyLimit(packageName, seconds)
+                            // Same reasoning as onboarding's onComplete above: a rule
+                            // just appeared while Orlune is already running, and the
+                            // monitor service only auto-starts at process cold start.
+                            BlockingMonitorService.start(context)
                         }
                     },
                     onAddSchedule = { name, packageName, days, start, end ->
                         scope.launch {
-                            val id = app.database.ruleDao().upsert(
-                                RuleEntity(type = "schedule", targetPackageOrCategory = packageName, threshold = null, windowDefinition = null)
-                            )
-                            app.database.scheduleDao().upsert(ScheduleEntity(name = name, daysOfWeek = days, startTime = start, endTime = end, associatedRuleId = id))
+                            app.ruleRepository.addSchedule(name, packageName, days, start, end)
+                            BlockingMonitorService.start(context)
                         }
                     },
-                    onDelete = { rule -> scope.launch { app.database.ruleDao().delete(rule) } }
+                    onDelete = { rule -> scope.launch { app.ruleRepository.delete(rule) } }
                 )
                 OrluneTab.INSIGHTS -> InsightsScreen(
                     modifier = Modifier.padding(padding),

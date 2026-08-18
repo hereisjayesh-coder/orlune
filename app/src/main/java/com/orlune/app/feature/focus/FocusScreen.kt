@@ -22,6 +22,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -32,16 +33,19 @@ import com.orlune.app.core.domain.focus.FocusSessionState
 import com.orlune.app.core.domain.focus.allowedNotificationPackages
 import com.orlune.app.data.local.entity.FocusSessionEntity
 import com.orlune.app.platform.usage.InstalledApp
+import com.orlune.app.platform.usage.InstalledAppSource
 import com.orlune.app.ui.components.DurationPresetSelector
 import com.orlune.app.ui.components.EmptyState
 import com.orlune.app.ui.components.InfoCard
 import com.orlune.app.ui.components.NotificationPolicySelector
 import com.orlune.app.ui.components.SessionLine
 import com.orlune.app.ui.components.label
+import com.orlune.app.ui.components.rememberAppDisplayInfos
 
 @Composable
 fun FocusScreen(
     modifier: Modifier,
+    installedAppSource: InstalledAppSource,
     selectedApps: List<InstalledApp>,
     minutesText: String,
     onMinutesChange: (String) -> Unit,
@@ -67,6 +71,10 @@ fun FocusScreen(
         val state = FocusSessionEngine.stateOf(it, System.currentTimeMillis())
         state == FocusSessionState.ACTIVE || state == FocusSessionState.SCHEDULED
     }
+    val blockedPackageEntries = remember(activeOrScheduled) {
+        activeOrScheduled.flatMap { FocusSessionEngine.blockedPackages(it) }.distinct().map { it to (null as String?) }
+    }
+    val blockedAppDisplay = rememberAppDisplayInfos(installedAppSource, blockedPackageEntries)
     val involvesCalls = notificationPolicy == FocusNotificationPolicy.ALLOW_CALLS ||
         notificationPolicy == FocusNotificationPolicy.ALLOW_CALLS_AND_SELECTED
 
@@ -192,7 +200,7 @@ fun FocusScreen(
         if (activeOrScheduled.isNotEmpty()) {
             item { Text("Current sessions", style = MaterialTheme.typography.titleLarge) }
             items(activeOrScheduled, key = { it.id }) { session ->
-                SessionLine(session)
+                SessionLine(session, blockedAppDisplay)
                 Text(
                     notificationSummary(session, notificationPolicyAccessGranted),
                     style = MaterialTheme.typography.bodySmall,

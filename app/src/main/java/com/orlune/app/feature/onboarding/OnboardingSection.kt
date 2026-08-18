@@ -15,14 +15,13 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.orlune.app.core.domain.focus.FocusNotificationPolicy
+import com.orlune.app.core.domain.onboarding.OnboardingDailyLimit
 import com.orlune.app.core.domain.onboarding.OnboardingGoal
 import com.orlune.app.core.domain.onboarding.parseOnboardingGoals
-import com.orlune.app.core.domain.rules.DailyLimitInput
 import com.orlune.app.feature.apppicker.AppPickerMode
 import com.orlune.app.feature.apppicker.AppPickerScreen
 import com.orlune.app.feature.privacy.LegalCenterScreen
 import com.orlune.app.feature.privacy.LegalDocumentScreen
-import com.orlune.app.platform.usage.InstalledApp
 import com.orlune.app.platform.usage.InstalledAppSource
 import com.orlune.app.ui.components.formatDuration
 import com.orlune.app.ui.components.label
@@ -50,11 +49,11 @@ fun OnboardingSection(
     onOpenUsageAccessSettings: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
     onOpenNotificationPolicySettings: () -> Unit,
-    onAddLimitRule: (packageName: String, seconds: Long) -> Unit,
     onComplete: (
         goals: Set<OnboardingGoal>,
         customGoalText: String,
-        focusNotificationPreference: FocusNotificationPolicy
+        focusNotificationPreference: FocusNotificationPolicy,
+        dailyLimitPlan: OnboardingDailyLimit.Plan?
     ) -> Unit
 ) {
     val backStack = remember { mutableStateListOf<OnboardingDestination>(OnboardingDestination.Welcome) }
@@ -68,7 +67,16 @@ fun OnboardingSection(
     val selectedGoals = remember(goalsText) { parseOnboardingGoals(goalsText) }
     var customGoalText by rememberSaveable { mutableStateOf("") }
 
-    var selectedApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
+    // Package names only, comma-joined (Bundle-safe) — same shape as goalsText above.
+    // Previously this held the full List<InstalledApp> in plain `remember`, which does
+    // NOT survive process death: a killed-and-restored onboarding session would lose
+    // the app selection while every other rememberSaveable field on this screen
+    // (goals, custom duration, notification policy) survived intact. Only the package
+    // name is ever actually needed downstream (dailyLimitPlan, appCount).
+    var selectedAppPackagesText by rememberSaveable { mutableStateOf("") }
+    val selectedPackages = remember(selectedAppPackagesText) {
+        selectedAppPackagesText.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    }
 
     var limitSkipped by rememberSaveable { mutableStateOf(false) }
     var selectedPresetMinutes by rememberSaveable { mutableStateOf<Int?>(60) }
@@ -88,11 +96,10 @@ fun OnboardingSection(
         }
     }
 
-    fun dailyLimitSeconds(): Long? {
-        if (limitSkipped) return null
-        val hours = if (customLimitSelected) customLimitHours else (selectedPresetMinutes ?: 0) / 60
-        val minutes = if (customLimitSelected) customLimitMinutes else (selectedPresetMinutes ?: 0) % 60
-        return DailyLimitInput.toThresholdSeconds(hours, minutes).getOrNull()
+    val dailyLimitHours = if (customLimitSelected) customLimitHours else (selectedPresetMinutes ?: 0) / 60
+    val dailyLimitMinutes = if (customLimitSelected) customLimitMinutes else (selectedPresetMinutes ?: 0) % 60
+    val dailyLimitPlan = remember(limitSkipped, dailyLimitHours, dailyLimitMinutes, selectedPackages) {
+        OnboardingDailyLimit.plan(limitSkipped, dailyLimitHours, dailyLimitMinutes, selectedPackages)
     }
 
     when (val destination = backStack.last()) {
@@ -157,9 +164,9 @@ fun OnboardingSection(
                 title = "Which apps steal your time?",
                 subtitle = "For example: Instagram, YouTube, Facebook, Reddit.",
                 mode = AppPickerMode.Multi(
-                    initialSelection = selectedApps.map { it.packageName }.toSet(),
+                    initialSelection = selectedPackages.toSet(),
                     onConfirm = { picked ->
-                        selectedApps = picked.toList()
+                        selectedAppPackagesText = picked.joinToString(",") { it.packageName }
                         backStack.add(OnboardingDestination.DailyLimit)
                     }
                 ),
@@ -183,18 +190,14 @@ fun OnboardingSection(
             )
         }
         OnboardingDestination.Finish -> saveableStateHolder.SaveableStateProvider(destination.toString()) {
-            val limitSeconds = dailyLimitSeconds()
             OnboardingFinishScreen(
                 modifier = modifier,
                 goalSummary = onboardingGoalSummary(selectedGoals, customGoalText),
-                appCount = selectedApps.size,
-                dailyLimitSummary = if (limitSeconds != null) formatDuration(limitSeconds) else "Not set",
+                appCount = selectedPackages.size,
+                dailyLimitSummary = if (dailyLimitPlan != null) formatDuration(dailyLimitPlan.thresholdSeconds) else "Not set",
                 focusNotificationSummary = focusNotificationPolicy.label(),
                 onStartUsingOrlune = {
-                    if (limitSeconds != null) {
-                        selectedApps.forEach { app -> onAddLimitRule(app.packageName, limitSeconds) }
-                    }
-                    onComplete(selectedGoals, customGoalText, focusNotificationPolicy)
+                    onComplete(selectedGoals, customGoalText, focusNotificationPolicy, dailyLimitPlan)
                 }
             )
         }

@@ -15,6 +15,7 @@ import com.orlune.app.data.local.OrluneMigrations
 import com.orlune.app.data.repository.BlockingRepository
 import com.orlune.app.data.repository.FocusSessionRepository
 import com.orlune.app.data.repository.OnboardingRepository
+import com.orlune.app.data.repository.RuleRepository
 import com.orlune.app.data.repository.UsageRepository
 import com.orlune.app.platform.blocking.BlockingMonitorService
 import com.orlune.app.platform.blocking.OverlayPermission
@@ -37,7 +38,12 @@ class OrluneApplication : Application(), Configuration.Provider {
         // Version 1 -> 2 uses an explicit preserving migration (see OrluneMigrations.kt);
         // unsupported upgrades must fail rather than silently deleting local user data.
         Room.databaseBuilder(this, OrluneDatabase::class.java, OrluneDatabase.DATABASE_NAME)
-            .addMigrations(OrluneMigrations.MIGRATION_1_2, OrluneMigrations.MIGRATION_2_3, OrluneMigrations.MIGRATION_3_4)
+            .addMigrations(
+                OrluneMigrations.MIGRATION_1_2,
+                OrluneMigrations.MIGRATION_2_3,
+                OrluneMigrations.MIGRATION_3_4,
+                OrluneMigrations.MIGRATION_4_5
+            )
             .build()
     }
 
@@ -62,6 +68,7 @@ class OrluneApplication : Application(), Configuration.Provider {
             dailyUsageDao = database.dailyUsageDao(),
             sessionDao = database.sessionDao(),
             focusSessionDao = database.focusSessionDao(),
+            ruleSnoozeDao = database.ruleSnoozeDao(),
             ownPackageName = packageName
         )
     }
@@ -72,6 +79,14 @@ class OrluneApplication : Application(), Configuration.Provider {
 
     val onboardingRepository: OnboardingRepository by lazy {
         OnboardingRepository(onboardingStateDao = database.onboardingStateDao())
+    }
+
+    val ruleRepository: RuleRepository by lazy {
+        RuleRepository(
+            ruleDao = database.ruleDao(),
+            scheduleDao = database.scheduleDao(),
+            ruleSnoozeDao = database.ruleSnoozeDao()
+        )
     }
 
     override val workManagerConfiguration: Configuration

@@ -15,6 +15,7 @@ import com.orlune.app.data.local.dao.NotificationPreferenceDao
 import com.orlune.app.data.local.dao.OnboardingStateDao
 import com.orlune.app.data.local.dao.PrivacySettingDao
 import com.orlune.app.data.local.dao.RuleDao
+import com.orlune.app.data.local.dao.RuleSnoozeDao
 import com.orlune.app.data.local.dao.ScheduleDao
 import com.orlune.app.data.local.dao.SessionDao
 import com.orlune.app.data.local.dao.ThemePreferenceDao
@@ -32,6 +33,7 @@ import com.orlune.app.data.local.entity.NotificationPreferenceEntity
 import com.orlune.app.data.local.entity.OnboardingStateEntity
 import com.orlune.app.data.local.entity.PrivacySettingEntity
 import com.orlune.app.data.local.entity.RuleEntity
+import com.orlune.app.data.local.entity.RuleSnoozeEntity
 import com.orlune.app.data.local.entity.ScheduleEntity
 import com.orlune.app.data.local.entity.SessionEntity
 import com.orlune.app.data.local.entity.ThemePreferenceEntity
@@ -62,8 +64,13 @@ import com.orlune.app.data.local.entity.UserPreferenceEntity
  * onboarding pop up (an app-layer backfill in `OrluneApplication`, not this
  * migration — onboarding is a first-*launch* concept, not a first-*version* one).
  *
+ * version 5 (block-screen snooze): new `rule_snoozes` table (`RuleSnoozeEntity`) — a
+ * new table, not an altered one, so no existing row anywhere is touched. Holds a
+ * per-package "allowed until" timestamp used only to temporarily override a would-be
+ * BLOCK decision; it never edits a rule, schedule, or focus session.
+ *
  * `OrluneApplication`'s `Room.databaseBuilder` wires up the explicit, data-preserving
- * `OrluneMigrations.MIGRATION_1_2`, `MIGRATION_2_3`, and `MIGRATION_3_4` — never
+ * `OrluneMigrations.MIGRATION_1_2` through `MIGRATION_4_5` — never
  * `fallbackToDestructiveMigration()` — and `OrluneDatabaseMigrationTest` verifies
  * every prior-version table's rows survive each upgrade. See `OrluneMigrations.kt`.
  */
@@ -85,9 +92,10 @@ import com.orlune.app.data.local.entity.UserPreferenceEntity
         LocalRecommendationEntity::class,
         EmergencyOverrideEntity::class,
         PrivacySettingEntity::class,
-        OnboardingStateEntity::class
+        OnboardingStateEntity::class,
+        RuleSnoozeEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class OrluneDatabase : RoomDatabase() {
@@ -108,6 +116,7 @@ abstract class OrluneDatabase : RoomDatabase() {
     abstract fun emergencyOverrideDao(): EmergencyOverrideDao
     abstract fun privacySettingDao(): PrivacySettingDao
     abstract fun onboardingStateDao(): OnboardingStateDao
+    abstract fun ruleSnoozeDao(): RuleSnoozeDao
 
     companion object {
         const val DATABASE_NAME = "orlune.db"

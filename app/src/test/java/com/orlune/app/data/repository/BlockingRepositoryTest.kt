@@ -7,12 +7,14 @@ import com.orlune.app.data.local.dao.AppListEntryDao
 import com.orlune.app.data.local.dao.DailyUsageDao
 import com.orlune.app.data.local.dao.FocusSessionDao
 import com.orlune.app.data.local.dao.RuleDao
+import com.orlune.app.data.local.dao.RuleSnoozeDao
 import com.orlune.app.data.local.dao.ScheduleDao
 import com.orlune.app.data.local.dao.SessionDao
 import com.orlune.app.data.local.entity.AppListEntryEntity
 import com.orlune.app.data.local.entity.DailyUsageEntity
 import com.orlune.app.data.local.entity.FocusSessionEntity
 import com.orlune.app.data.local.entity.RuleEntity
+import com.orlune.app.data.local.entity.RuleSnoozeEntity
 import com.orlune.app.data.local.entity.ScheduleEntity
 import com.orlune.app.data.local.entity.SessionEntity
 import kotlinx.coroutines.flow.Flow
@@ -90,6 +92,13 @@ class BlockingRepositoryTest {
         override fun observeAll(): Flow<List<FocusSessionEntity>> = flowOf(sessions)
     }
 
+    private class FakeRuleSnoozeDao(private val snoozes: Map<String, RuleSnoozeEntity> = emptyMap()) : RuleSnoozeDao {
+        override suspend fun upsert(snooze: RuleSnoozeEntity) {}
+        override suspend fun get(packageName: String): RuleSnoozeEntity? = snoozes[packageName]
+        override suspend fun delete(packageName: String) {}
+        override fun observeAll(): Flow<List<RuleSnoozeEntity>> = flowOf(snoozes.values.toList())
+    }
+
     private fun focusSession(
         blockedPackages: List<String>,
         startTs: Long,
@@ -115,6 +124,7 @@ class BlockingRepositoryTest {
         listEntries: List<AppListEntryEntity> = emptyList(),
         usageByPackage: Map<String, Long> = emptyMap(),
         focusSessions: List<FocusSessionEntity> = emptyList(),
+        snoozes: Map<String, RuleSnoozeEntity> = emptyMap(),
         zoneId: ZoneId = zone,
         now: Long = fixedNow
     ) = BlockingRepository(
@@ -127,6 +137,7 @@ class BlockingRepositoryTest {
             else listOf(SessionEntity(packageName = foregroundPackage, startTs = openSessionStartTs, endTs = null))
         ),
         focusSessionDao = FakeFocusSessionDao(focusSessions),
+        ruleSnoozeDao = FakeRuleSnoozeDao(snoozes),
         ownPackageName = "com.orlune.app",
         zoneId = zoneId,
         nowMillis = { now }
@@ -327,5 +338,56 @@ class BlockingRepositoryTest {
             zoneId = kolkata
         ).evaluate()
         assertEquals(BlockDecision.BLOCK, outcome.decision)
+    }
+
+    @Test
+    fun `an active snooze allows a package that would otherwise be blocked`() = runTest {
+        val rule = RuleEntity(id = 1, type = "limit", targetPackageOrCategory = "app.a", threshold = 60, windowDefinition = null)
+        val outcome = repository(
+            rules = listOf(rule),
+            usageByPackage = mapOf("app.a" to 999),
+            snoozes = mapOf("app.a" to RuleSnoozeEntity("app.a", snoozedUntil = fixedNow + 60_000))
+        ).evaluate()
+        assertEquals(BlockDecision.ALLOW, outcome.decision)
+    }
+
+    @Test
+    fun `an expired snooze no longer allows a triggered rule`() = runTest {
+        val rule = RuleEntity(id = 1, type = "limit", targetPackageOrCategory = "app.a", threshold = 60, windowDefinition = null)
+        val outcome = repository(
+            rules = listOf(rule),
+            usageByPackage = mapOf("app.a" to 999),
+            snoozes = mapOf("app.a" to RuleSnoozeEntity("app.a", snoozedUntil = fixedNow - 1))
+        ).evaluate()
+        assertEquals(BlockDecision.BLOCK, outcome.decision)
+    }
+
+    @Test
+    fun `a snooze for a different package does not allow the triggered one`() = runTest {
+        val rule = RuleEntity(id = 1, type = "limit", targetPackageOrCategory = "app.a", threshold = 60, windowDefinition = null)
+        val outcome = repository(
+            rules = listOf(rule),
+            usageByPackage = mapOf("app.a" to 999),
+            snoozes = mapOf("app.other" to RuleSnoozeEntity("app.other", snoozedUntil = fixedNow + 60_000))
+        ).evaluate()
+        assertEquals(BlockDecision.BLOCK, outcome.decision)
+    }
+
+    @Test
+    fun `a snooze does not manufacture a block for a package with no triggered rule`() = runTest {
+        val outcome = repository(
+            snoozes = mapOf("app.a" to RuleSnoozeEntity("app.a", snoozedUntil = fixedNow + 60_000))
+        ).evaluate()
+        assertEquals(BlockDecision.ALLOW, outcome.decision)
+    }
+
+    @Test
+    fun `a snooze also overrides an active focus-session block`() = runTest {
+        val session = focusSession(blockedPackages = listOf("app.a"), startTs = fixedNow - 60_000)
+        val outcome = repository(
+            focusSessions = listOf(session),
+            snoozes = mapOf("app.a" to RuleSnoozeEntity("app.a", snoozedUntil = fixedNow + 60_000))
+        ).evaluate()
+        assertEquals(BlockDecision.ALLOW, outcome.decision)
     }
 }

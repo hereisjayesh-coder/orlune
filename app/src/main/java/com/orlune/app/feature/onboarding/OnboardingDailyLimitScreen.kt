@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.orlune.app.core.domain.onboarding.OnboardingDailyLimit
 import com.orlune.app.ui.components.DurationStepper
 import com.orlune.app.ui.components.formatDuration
 
@@ -40,6 +41,10 @@ fun OnboardingDailyLimitScreen(
     val currentHours = if (customSelected) customHours else (selectedPresetMinutes ?: 0) / 60
     val currentMinutes = if (customSelected) customMinutes else (selectedPresetMinutes ?: 0) % 60
     val previewSeconds = (currentHours * 3600L) + (currentMinutes * 60L)
+    // Presets (30/45/60/90) are always valid; only a hand-set Custom duration can be
+    // 0 — disabling Continue here (rather than silently discarding it at Finish, the
+    // previous behavior) is what actually satisfies "reject 0 minutes."
+    val validDuration = OnboardingDailyLimit.isValidDuration(currentHours, currentMinutes)
 
     OnboardingScaffold(
         modifier = modifier,
@@ -47,6 +52,7 @@ fun OnboardingDailyLimitScreen(
         subtitle = "This is your starting limit. You can change it anytime.",
         primaryLabel = "Continue",
         onPrimary = onContinue,
+        primaryEnabled = validDuration,
         secondaryLabel = "Skip for now",
         onSecondary = onSkip
     ) {
@@ -74,11 +80,19 @@ fun OnboardingDailyLimitScreen(
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "= ${formatDuration(previewSeconds)}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (validDuration) {
+                Text(
+                    "= ${formatDuration(previewSeconds)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    "Set a duration of at least 1 minute to continue.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }
