@@ -47,7 +47,9 @@ import com.orlune.app.platform.notifications.NotificationPolicyAccessPermission
 import com.orlune.app.platform.usage.UsageAccessPermission
 import com.orlune.app.ui.components.orluneSafeAreaPadding
 import com.orlune.app.ui.navigation.OrluneTab
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -329,7 +331,7 @@ fun OrluneRoot(app: OrluneApplication, openFocusForPackage: String? = null) {
                     showDeleteDialog = false
                     scope.launch {
                         BlockingMonitorService.stop(context)
-                        app.database.clearAllTables()
+                        withContext(Dispatchers.IO) { app.database.clearAllTables() }
                     }
                 }) { Text("Delete all") }
             },
@@ -347,7 +349,7 @@ fun OrluneRoot(app: OrluneApplication, openFocusForPackage: String? = null) {
                     showResetDialog = false
                     scope.launch {
                         BlockingMonitorService.stop(context)
-                        app.database.clearAllTables()
+                        withContext(Dispatchers.IO) { app.database.clearAllTables() }
                     }
                 }) { Text("Reset") }
             },
