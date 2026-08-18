@@ -1,23 +1,65 @@
 # Orlune — Project State
 
-**Last verification date:** 2026-08-17 (added the complete first-launch onboarding
-flow: 11 screens — Welcome, What Orlune does, Privacy, Usage Access, Blocking screen,
-Focus notifications, Goal, Choose apps, Daily limit, Finish, then Home — reusing every
-existing permission/picker/notification-policy implementation, nothing rebuilt. A real
-rendering bug was found and fixed only by running the flow on-device; see "Current
-phase" below. `bdf4c58`'s Focus notification/quiet mode is unchanged by this session.)
+**Last verification date:** 2026-08-18 (workspace migration/backup session — see
+"Workspace migration" section below. No product feature work was done. The
+2026-08-17 first-launch onboarding entry below is otherwise unchanged and describes
+real prior work; only its "not yet committed" claim is now stale — see the corrected
+commit note immediately below.)
 
-**Latest verified commit:** working tree as of this file's date, on top of `bdf4c58`
-("feat: add focus notification quiet mode") — this session's changes are **not yet
-committed** (uncommitted working-tree changes only, not pushed) pending explicit
-instruction to commit; verify with `git log`/`git status` before trusting this file's
-claims if picking this up later; this file is a snapshot, not a substitute for
-checking the real repository state.
+**Latest verified commit:** `47ef5cc` ("chore: checkpoint before workspace
+migration"), pushed to and matching `origin/main`, on top of `fa1336e` ("feat: add
+first-launch onboarding" — the 2026-08-17 work described below, which **is now
+committed**, correcting that entry's "not yet committed" claim). `47ef5cc` itself
+checkpoints a *separate*, newer batch of previously-uncommitted work found already
+sitting in the working tree at the start of this migration session: a rule-snooze
+feature (`RuleSnoozeEntity`, `RuleSnoozeDao`, `RuleRepository`), a new
+`core/domain/onboarding/OnboardingDailyLimit.kt`, a new `ui/components/SafeArea.kt`,
+Room schema v5, and related modifications across
+`BlockingRepository`/`OrluneDatabase`/`OrluneMigrations`/`FocusScreen`/
+`FocusSection`/onboarding screens/`BlockOverlayController`/`BlockingMonitorService`/
+`OrluneRoot`/`Rows`, plus their unit/instrumentation tests. **This batch's
+build/test/device status has not been independently re-verified in this migration
+session** — it was committed as-is, untouched, purely to prevent data loss ahead of
+the drive move. Do not assume it is build-clean or feature-complete; verify with
+`git show 47ef5cc --stat` and a real build before treating it as done. Always verify
+with `git log`/`git status` before trusting this file's claims if picking this up
+later; this file is a snapshot, not a substitute for checking the real repository
+state.
 
 This file is the living status snapshot. `AGENTS.MD` is the stable rules/conventions
 file — read that first for *how* to work on this repo, this file for *where things
 currently stand*. Update this file (not `AGENTS.MD`) after any verification pass or
 significant change; keep `AGENTS.MD` stable unless a rule itself changes.
+
+---
+
+## Workspace migration (2026-08-18)
+
+The primary workspace is moving off `D:\App` because the `C:` drive is nearly full
+and the user is preparing to modify/merge the `D:` partition into `C:`. The project
+was pre-copied by the user to **`F:\Orlune\App`** (not `F:\App` — the user's own copy
+step landed one directory level deeper than expected; this was verified directly,
+not assumed).
+
+- Both `D:\App` and `F:\Orlune\App` working trees are confirmed byte-identical
+  (`diff -rq`, excluding `.git`/`build`/`.gradle`), including every previously
+  uncommitted file.
+- `D:\App`'s working tree was committed and pushed as `47ef5cc` (see above) before
+  migration, so no work exists only as uncommitted state anymore.
+- `F:\Orlune\App`'s `.git` has fetched `47ef5cc` but its `HEAD`/index are still one
+  commit behind, at `fa1336e` (a `git reset`/`git pull` there was blocked by this
+  session's tool permissions). **Remaining action:** from `F:\Orlune\App`, run
+  `git pull --ff-only origin main` (working-tree content already matches, so this
+  should apply cleanly) to bring `HEAD` in sync with `origin/main`.
+- A full zip backup of `D:\App` (`.git`, `.claude`, everything) was made at
+  `D:\ORLUNE_BACKUP_20260818_091020.zip` (~51 MB) as an independent safety copy, plus
+  a `git diff --binary` patch at `D:\App\ORLUNE_WORKING_TREE_BACKUP.patch` (superseded
+  by the `47ef5cc` commit itself — kept only as a redundant local artifact, not
+  committed).
+- `D:\App` has **not** been deleted and should not be until the remaining action
+  above is done and a build is verified from `F:\Orlune\App`.
+- All future sessions should open the project at **`F:\Orlune\App`**, not `D:\App`
+  or `F:\App`.
 
 ---
 
@@ -373,6 +415,9 @@ implemented, tested, and device-verified this session, not still pending. Do not
 start Google Play / release-prep work without explicit sign-off — Phase 12/13 remain
 untouched by design.
 
-Do not start any without user sign-off. This session's changes exist only as
-uncommitted working-tree changes — not committed, not pushed; see the session's own
-summary for the exact file list.
+Do not start any without user sign-off. The onboarding work described above is
+committed (`fa1336e`, pushed). A separate, newer batch of work (rule-snooze +
+onboarding daily-limit — see the corrected commit note near the top of this file) was
+found already uncommitted at the start of the 2026-08-18 migration session and was
+checkpointed as `47ef5cc`, also pushed; its build/test status is unverified — see
+"Workspace migration" above.
