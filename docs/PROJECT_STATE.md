@@ -1,12 +1,74 @@
 # Orlune — Project State
 
-**Last verification date:** 2026-08-19 (release-hardening session — see "Release
-hardening" section below, the current authoritative status). The 2026-08-18 and
-2026-08-17 entries below are unchanged and describe real prior work.
+**Last verification date:** 2026-08-19 (release-candidate prep session — see
+"Release candidate status" immediately below, the current authoritative status).
+The "Release hardening" and earlier entries below are unchanged and describe real
+prior work.
 
-**Latest verified commit:** `c19e3ec` ("build: enable R8 minification and resource
-shrinking for release"), pushed to and matching `origin/main`. See "Release
-hardening" below for the full chain back through `9f75145` and `4967f3a`.
+**Latest verified commit:** as of this edit, working tree changes are staged but
+**not yet committed** (per this session's explicit instruction — review the diff
+first). Once committed, this should be the next `HEAD`, on top of `480f192`
+("docs: record release-hardening session findings"), which is pushed to and
+matches `origin/main`. See "Release hardening" below for the full chain back
+through `c19e3ec`, `9f75145`, and `4967f3a`.
+
+---
+
+## Release candidate status (2026-08-19)
+
+**Version:** `versionName = "1.0.0"`, `versionCode = 1` — bumped from `"0.1.0"`
+this session (`app/build.gradle.kts`), pure version-metadata change, no product
+behavior altered. This is the first version number intended for actual Play Store
+submission; nothing has been published yet.
+
+**What this session did:** release-*infrastructure* prep only, on top of the
+already-complete release-hardening pass below — no product functionality changed.
+Added `docs/RELEASE_PROCESS.md` (the full signing/versioning/build/test/Play
+Console checklist) and `docs/CHANGELOG.md` (first `1.0.0` entry summarizing the
+full feature set built to date). Added `keystore.properties`/
+`*.keystore.properties`/`signing.properties` to `.gitignore` alongside the
+existing `*.jks`/`*.keystore`/`local.properties` coverage, ahead of the signing
+setup `docs/RELEASE_PROCESS.md` Section 2 describes. Ran `testDebugUnitTest` and
+`assembleDebug` after the version bump — see "Verification after version bump"
+below.
+
+**Remaining release blockers** (unchanged in substance from the release-hardening
+pass, restated here as the live list — see `docs/RELEASE_PROCESS.md` Section 5 for
+the full ordered checklist):
+
+1. **No release signing key exists.** Not generated this session, deliberately —
+   generating and securing it is a human decision (`docs/RELEASE_PROCESS.md`
+   Section 2 documents exactly what to run and where it must live). Release builds
+   remain explicitly unsigned (`app-release-unsigned.apk`) until this is done.
+2. **No privacy-policy URL is hosted anywhere.** Independently blocks Play Console
+   submission regardless of the in-app Legal Center's content.
+3. **Legal review not done.** Every "Legal review required" row in
+   `docs/legal-compliance-matrix.md` is still open; the Privacy Policy/Terms of
+   Service `[TBD]` legal-entity/address/contact placeholders are still
+   placeholders.
+4. **Play Console Data Safety form not filled in.**
+   `docs/google-play-privacy-compliance.md`'s mapping is a drafting aid, not a
+   completed submission.
+5. **No Play Store listing assets exist**: no screenshots, no feature graphic, no
+   store description copy, no content-rating/target-audience answers.
+6. **No staged/closed testing track has been used** — the app has only ever been
+   sideloaded for development/testing, never installed via Play.
+
+Nothing above is a code defect — all are business/legal/asset/infrastructure gaps
+outside what an agent should resolve unprompted. `docs/RELEASE_PROCESS.md` Section
+5 is the authoritative ordered checklist; update *this* list (not that one) as
+each blocker actually closes.
+
+### Verification after version bump
+
+`testDebugUnitTest` and `assembleDebug` re-run after changing only `versionName`
+in `app/build.gradle.kts` (a metadata-only field with zero code-path
+dependencies, so this is a formality, not a real risk) — both **BUILD
+SUCCESSFUL**, unit tests still 233/233. Full re-verification of
+`connectedDebugAndroidTest`/`assembleRelease`/`bundleRelease` was not re-run this
+session since nothing behavioral changed since the release-hardening pass already
+verified them against this exact code — re-run before the actual signed upload,
+per `docs/RELEASE_PROCESS.md` Section 4.
 
 ---
 
