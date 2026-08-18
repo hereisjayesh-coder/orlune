@@ -27,8 +27,21 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Verified safe this session: a full on-device pass (onboarding, Room
+            // reads/writes, the blocking overlay + BlockReason display, quiet mode,
+            // and the delete-all-data flow) against an R8-minified,
+            // resource-shrunk build produced no crashes or missing-class/resource
+            // failures with the default AndroidX/Compose/Room/WorkManager consumer
+            // ProGuard rules — no custom keep rules were needed. See
+            // docs/PROJECT_STATE.md for the verification detail.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // No release signingConfig yet — no signing key exists for this project
+            // (see docs/PROJECT_STATE.md / AGENTS.MD "Release rules"). Generating one
+            // is a deliberate, hard-to-reverse decision for the user to make, not
+            // something to create unprompted; this build type intentionally builds
+            // unsigned until that happens.
         }
     }
 
