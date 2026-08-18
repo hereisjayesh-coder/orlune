@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.os.Build
+import android.util.LruCache
 import androidx.core.graphics.drawable.toBitmap
 
 /**
@@ -13,8 +14,23 @@ import androidx.core.graphics.drawable.toBitmap
  * docs/app-visibility-compliance.md). This is the same scoped mechanism
  * [AppLabelResolver] already relies on for single-package label lookups; this class
  * enumerates the whole launchable set for the app picker.
+ *
+ * One instance lives for the process's whole lifetime ([com.orlune.app.OrluneApplication.installedAppLister]
+ * is a `by lazy` val), so [cache] is a real cross-screen cache, not a per-composition
+ * one: Home, Insights, Limits, Focus, the app picker, and
+ * [com.orlune.app.platform.blocking.BlockingMonitorService] (which re-resolves the
+ * blocked app's icon on every 3-second tick while a block screen is showing) all share
+ * it, so the same package's icon is only ever decoded from PackageManager once per
+ * process, not once per screen visit or once per tick.
  */
 class InstalledAppLister(private val context: Context) : InstalledAppSource {
+
+    /** Bounded by entry count so a device with an unusually large app catalog can't
+     * grow this without limit — 200 comfortably covers a typical launchable-app count
+     * (with the label + a decoded icon Bitmap each) while still bounding worst-case
+     * memory. A resolved [InstalledApp] never changes for a given [packageName] within
+     * a process's lifetime without an app update, which restarts this process anyway. */
+    private val cache = LruCache<String, InstalledApp>(200)
 
     override fun listLaunchableApps(excludePackage: String?): List<InstalledApp> {
         val packageManager = context.packageManager
@@ -51,8 +67,9 @@ class InstalledAppLister(private val context: Context) : InstalledAppSource {
     }
 
     private fun resolveApp(packageName: String): InstalledApp? {
+        cache.get(packageName)?.let { return it }
         val packageManager = context.packageManager
-        return runCatching {
+        val resolved = runCatching {
             val appInfo = packageManager.getApplicationInfo(packageName, 0)
             InstalledApp(
                 packageName = packageName,
@@ -60,5 +77,7 @@ class InstalledAppLister(private val context: Context) : InstalledAppSource {
                 icon = runCatching { packageManager.getApplicationIcon(packageName).toBitmap() }.getOrNull()
             )
         }.getOrNull()
+        if (resolved != null) cache.put(packageName, resolved)
+        return resolved
     }
 }

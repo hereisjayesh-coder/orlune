@@ -22,6 +22,17 @@ data class AppPeriodUsage(
     val sessionCount: Int
 )
 
+/** One app's usage on one specific day — the raw material
+ * [com.orlune.app.core.domain.insights.InsightsMetrics.weeklyBreakdown] buckets into
+ * weeks itself, so a 4-week view needs only this one query instead of four separate
+ * per-week ones. */
+data class DayAppUsageRow(
+    val packageName: String,
+    val label: String?,
+    val epochDay: Long,
+    val totalUsageSeconds: Long
+)
+
 @Dao
 interface DailyUsageDao {
     @Upsert
@@ -72,6 +83,17 @@ interface DailyUsageDao {
         """
     )
     fun observeAppTotalsBetween(startEpochDay: Long, endEpochDay: Long): Flow<List<AppPeriodUsage>>
+
+    @Query(
+        """
+        SELECT daily_usage.packageName AS packageName, apps.label AS label,
+               daily_usage.epochDay AS epochDay, daily_usage.totalUsageSeconds AS totalUsageSeconds
+        FROM daily_usage
+        LEFT JOIN apps ON apps.packageName = daily_usage.packageName
+        WHERE daily_usage.epochDay BETWEEN :startEpochDay AND :endEpochDay
+        """
+    )
+    fun observeAppDailyUsageBetween(startEpochDay: Long, endEpochDay: Long): Flow<List<DayAppUsageRow>>
 
     /** Total stored daily-usage row count, for the Privacy Center's "data stored" summary. */
     @Query("SELECT COUNT(*) FROM daily_usage")

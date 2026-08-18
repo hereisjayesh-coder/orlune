@@ -2,11 +2,13 @@ package com.orlune.app.data.repository
 
 import com.orlune.app.core.domain.focus.FocusSessionEngine
 import com.orlune.app.core.domain.focus.FocusSessionState
+import com.orlune.app.core.domain.rules.AppListType
 import com.orlune.app.core.domain.rules.BlockDecision
 import com.orlune.app.core.domain.rules.BlockingEngine
 import com.orlune.app.core.domain.rules.LimitEngine
 import com.orlune.app.core.domain.rules.LimitState
 import com.orlune.app.core.domain.rules.ScheduleEngine
+import com.orlune.app.core.domain.rules.listType
 import com.orlune.app.data.local.dao.AppListEntryDao
 import com.orlune.app.data.local.dao.DailyUsageDao
 import com.orlune.app.data.local.dao.FocusSessionDao
@@ -14,6 +16,7 @@ import com.orlune.app.data.local.dao.RuleDao
 import com.orlune.app.data.local.dao.RuleSnoozeDao
 import com.orlune.app.data.local.dao.ScheduleDao
 import com.orlune.app.data.local.dao.SessionDao
+import com.orlune.app.data.local.entity.AppListEntryEntity
 import com.orlune.app.data.local.entity.RuleEntity
 import com.orlune.app.data.local.entity.SessionEntity
 import kotlinx.coroutines.flow.first
@@ -57,7 +60,26 @@ class BlockingRepository(
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val nowMillis: () -> Long = System::currentTimeMillis
 ) {
-    data class Outcome(val packageName: String?, val decision: BlockDecision)
+    data class Outcome(val packageName: String?, val decision: BlockDecision, val reason: BlockReason? = null)
+
+    /**
+     * Presentation-only description of *why* [Outcome.decision] came out BLOCK — never
+     * consulted by [BlockingEngine.decide] or anything else that affects the decision
+     * itself, purely so the block screen can describe the real trigger instead of a
+     * generic "app blocked" ([com.orlune.app.platform.blocking.BlockOverlayController]
+     * is the only reader). When more than one trigger is simultaneously true, priority
+     * for *which one to describe* is Focus session, then daily limit, then schedule,
+     * then a bare block-list entry — display-only, doesn't change [evaluate]'s decision.
+     */
+    sealed interface BlockReason {
+        data class DailyLimit(val thresholdSeconds: Long, val usedSeconds: Long) : BlockReason
+        data class Schedule(val endTime: String) : BlockReason
+        data class Focus(val activeUntilMillis: Long) : BlockReason
+        /** A bare [com.orlune.app.data.local.entity.AppListEntryEntity] block-list entry
+         * — always-on, no time window to describe. Not reachable via any UI yet (see
+         * `AGENTS.MD` known risks), kept only so [determineReason] is total. */
+        data object Restricted : BlockReason
+    }
 
     /**
      * Fails toward [BlockDecision.ALLOW] whenever the target is ambiguous: no open
@@ -92,7 +114,77 @@ class BlockingRepository(
         if (decision == BlockDecision.BLOCK && isSnoozed(packageName)) {
             return Outcome(packageName, BlockDecision.ALLOW)
         }
-        return Outcome(packageName, decision)
+        if (decision != BlockDecision.BLOCK) {
+            return Outcome(packageName, decision)
+        }
+        return Outcome(packageName, decision, determineReason(packageName, rules, openSession, listEntries))
+    }
+
+    /** Re-derives *which* trigger to describe — a separate, best-effort pass over the
+     * same already-fetched data, run only on the rare BLOCK branch above, so it can
+     * never influence [evaluate]'s own decision computed just before it. */
+    private suspend fun determineReason(
+        packageName: String,
+        rules: List<RuleEntity>,
+        openSession: SessionEntity,
+        listEntries: List<AppListEntryEntity>
+    ): BlockReason? {
+        val focusEndMillis = activeBlockingFocusSessionEndMillis(packageName)
+        if (focusEndMillis != null) return BlockReason.Focus(focusEndMillis)
+
+        val limitRule = rules.firstOrNull { it.type == RULE_TYPE_LIMIT && isTriggered(it, openSession) }
+        if (limitRule?.threshold != null) {
+            return BlockReason.DailyLimit(
+                thresholdSeconds = limitRule.threshold,
+                usedSeconds = usedSecondsToday(limitRule.targetPackageOrCategory, openSession)
+            )
+        }
+
+        val scheduleRule = rules.firstOrNull { it.type == RULE_TYPE_SCHEDULE && isTriggered(it, openSession) }
+        if (scheduleRule != null) {
+            val activeSchedule = scheduleDao.observeForRule(scheduleRule.id).first()
+                .firstOrNull { schedule ->
+                    runCatching { ScheduleEngine.isActive(ScheduleEngine.parse(schedule), currentLocalDateTime()) }
+                        .getOrDefault(false)
+                }
+            if (activeSchedule != null) return BlockReason.Schedule(activeSchedule.endTime)
+        }
+
+        val isBlockListed = listEntries.any { it.packageName == packageName && it.listType() == AppListType.BLOCK }
+        return if (isBlockListed) BlockReason.Restricted else null
+    }
+
+    /** Same total this package's limit check just used to decide, recomputed once
+     * more purely for display — see [determineReason]'s KDoc for why a second,
+     * decision-inert pass is preferable to threading a return value through
+     * [isTriggered]'s boolean contract. */
+    private suspend fun usedSecondsToday(targetPackage: String, openSession: SessionEntity): Long {
+        val epochDay = Instant.ofEpochMilli(nowMillis()).atZone(zoneId).toLocalDate().toEpochDay()
+        val aggregatedSeconds = dailyUsageDao.getForAppAndDay(targetPackage, epochDay)?.totalUsageSeconds ?: 0L
+        val openSessionSeconds = if (openSession.packageName == targetPackage) {
+            val todayStartMillis = LocalDate.ofEpochDay(epochDay).atStartOfDay(zoneId).toInstant().toEpochMilli()
+            val clampedStart = maxOf(openSession.startTs, todayStartMillis)
+            (nowMillis() - clampedStart).coerceAtLeast(0) / 1000
+        } else {
+            0L
+        }
+        return aggregatedSeconds + openSessionSeconds
+    }
+
+    private fun currentLocalDateTime(): LocalDateTime =
+        LocalDateTime.ofInstant(Instant.ofEpochMilli(nowMillis()), zoneId)
+
+    /** Latest planned end-time among every currently-ACTIVE focus session that blocks
+     * [packageName] — the most conservative "active until" a caller could show, since
+     * blocking genuinely continues until every one of them ends. Null if none block it. */
+    private suspend fun activeBlockingFocusSessionEndMillis(packageName: String): Long? {
+        val now = nowMillis()
+        return focusSessionDao.observeAll().first()
+            .filter { session ->
+                FocusSessionEngine.stateOf(session, now) == FocusSessionState.ACTIVE &&
+                    packageName in FocusSessionEngine.blockedPackages(session)
+            }
+            .maxOfOrNull { it.startTs + it.plannedMinutes * 60_000L }
     }
 
     private suspend fun isSnoozed(packageName: String): Boolean {

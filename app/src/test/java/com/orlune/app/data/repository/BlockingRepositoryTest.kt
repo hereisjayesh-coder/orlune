@@ -71,6 +71,7 @@ class BlockingRepositoryTest {
         override fun observeForDayWithLabels(epochDay: Long): Flow<List<AppDailyUsage>> = flowOf(emptyList())
         override fun observeTotalSecondsBetween(startEpochDay: Long, endEpochDay: Long): Flow<Long> = flowOf(0L)
         override fun observeAppTotalsBetween(startEpochDay: Long, endEpochDay: Long): Flow<List<AppPeriodUsage>> = flowOf(emptyList())
+        override fun observeAppDailyUsageBetween(startEpochDay: Long, endEpochDay: Long): Flow<List<com.orlune.app.data.local.dao.DayAppUsageRow>> = flowOf(emptyList())
         override fun observeCount(): Flow<Int> = flowOf(0)
     }
 
@@ -389,5 +390,46 @@ class BlockingRepositoryTest {
             snoozes = mapOf("app.a" to RuleSnoozeEntity("app.a", snoozedUntil = fixedNow + 60_000))
         ).evaluate()
         assertEquals(BlockDecision.ALLOW, outcome.decision)
+    }
+
+    @Test
+    fun `a block from a triggered daily-limit rule reports its threshold and used seconds`() = runTest {
+        val rule = RuleEntity(id = 1, type = "limit", targetPackageOrCategory = "app.a", threshold = 60, windowDefinition = null)
+        val outcome = repository(rules = listOf(rule), usageByPackage = mapOf("app.a" to 999)).evaluate()
+        val reason = outcome.reason as? BlockingRepository.BlockReason.DailyLimit
+        assertEquals(60L, reason?.thresholdSeconds)
+        assertEquals(999L, reason?.usedSeconds)
+    }
+
+    @Test
+    fun `a block from an active schedule reports the schedule's end time`() = runTest {
+        val rule = RuleEntity(id = 1, type = "schedule", targetPackageOrCategory = "app.a", threshold = null, windowDefinition = null)
+        val schedule = ScheduleEntity(name = "Work hours", daysOfWeek = "MON", startTime = "09:00", endTime = "17:00", associatedRuleId = 1)
+        val outcome = repository(rules = listOf(rule), schedulesByRule = mapOf(1L to listOf(schedule))).evaluate()
+        val reason = outcome.reason as? BlockingRepository.BlockReason.Schedule
+        assertEquals("17:00", reason?.endTime)
+    }
+
+    @Test
+    fun `a block from an active focus session reports its planned end time, preferred over a co-triggered limit`() = runTest {
+        val rule = RuleEntity(id = 1, type = "limit", targetPackageOrCategory = "app.a", threshold = 60, windowDefinition = null)
+        val session = focusSession(blockedPackages = listOf("app.a"), startTs = fixedNow - 5 * 60_000, plannedMinutes = 25)
+        val outcome = repository(rules = listOf(rule), usageByPackage = mapOf("app.a" to 999), focusSessions = listOf(session)).evaluate()
+        val reason = outcome.reason as? BlockingRepository.BlockReason.Focus
+        assertEquals(fixedNow - 5 * 60_000 + 25 * 60_000L, reason?.activeUntilMillis)
+    }
+
+    @Test
+    fun `a block from a bare block-list entry with no rule reports Restricted`() = runTest {
+        val outcome = repository(
+            listEntries = listOf(AppListEntryEntity(packageName = "app.a", listType = "block"))
+        ).evaluate()
+        assertEquals(BlockingRepository.BlockReason.Restricted, outcome.reason)
+    }
+
+    @Test
+    fun `an ALLOW outcome never carries a reason`() = runTest {
+        val outcome = repository().evaluate()
+        assertEquals(null, outcome.reason)
     }
 }

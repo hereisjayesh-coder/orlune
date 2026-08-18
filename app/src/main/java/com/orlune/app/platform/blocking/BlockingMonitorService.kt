@@ -127,9 +127,16 @@ class BlockingMonitorService : Service() {
             val packageName = outcome.packageName
             when {
                 outcome.decision == BlockDecision.BLOCK && packageName != null -> {
-                    val label = app.database.appDao().get(packageName)?.label ?: packageName
+                    val storedLabel = app.database.appDao().get(packageName)?.label
+                    val live = app.installedAppLister.resolveDisplayInfo(packageName)
+                    val info = BlockInfo(
+                        packageName = packageName,
+                        label = live?.label ?: storedLabel?.takeIf { it.isNotBlank() && it != packageName } ?: packageName,
+                        icon = live?.icon,
+                        reason = outcome.reason
+                    )
                     // WindowManager.addView/removeView require a thread with a Looper.
-                    withContext(Dispatchers.Main) { overlayController.show(packageName, label) }
+                    withContext(Dispatchers.Main) { overlayController.show(info) }
                 }
                 else -> withContext(Dispatchers.Main) { overlayController.hide() }
             }

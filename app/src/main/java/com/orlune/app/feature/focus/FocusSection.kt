@@ -37,6 +37,11 @@ fun FocusSection(
     installedAppSource: InstalledAppSource,
     ownPackageName: String,
     todayUsageSecondsByPackage: Map<String, Long>,
+    /** A package to pre-select on first composition — e.g. the app the block screen's
+     * "Start Focus" button was just tapped from, so starting a session naturally
+     * includes pausing the very app that triggered it. Purely a starting point: the
+     * user can still add/remove apps normally afterward. */
+    initialSelectedPackage: String? = null,
     sessions: List<FocusSessionEntity>,
     usageAccessGranted: Boolean,
     overlayGranted: Boolean,
@@ -59,7 +64,10 @@ fun FocusSection(
     BackHandler(enabled = backStack.size > 1) { backStack.removeAt(backStack.lastIndex) }
     val saveableStateHolder = rememberSaveableStateHolder()
 
-    var selectedApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
+    var selectedApps by remember {
+        val initial = initialSelectedPackage?.let { installedAppSource.resolveDisplayInfo(it) }
+        mutableStateOf(if (initial != null) listOf(initial) else emptyList())
+    }
     var minutesText by rememberSaveable { mutableStateOf("25") }
     // Stored as the enum's name (a plain String), not the enum itself — this project
     // previously crashed from passing a non-Bundle-storable value into a Compose

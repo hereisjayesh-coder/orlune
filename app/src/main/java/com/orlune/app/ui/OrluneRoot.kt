@@ -52,10 +52,15 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 @Composable
-fun OrluneRoot(app: OrluneApplication) {
+fun OrluneRoot(app: OrluneApplication, openFocusForPackage: String? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var selectedTab by rememberSaveable { mutableStateOf(OrluneTab.HOME.name) }
+    // A one-shot cold-start hint from the block screen's "Start Focus" button (see
+    // MainActivity.EXTRA_OPEN_FOCUS_FOR_PACKAGE) — read once into the tab's initial
+    // value, same as [selectedTab] itself only seeds from HOME once. Not re-applied on
+    // every recomposition/tab switch, so navigating away from Focus afterward doesn't
+    // keep snapping back to it.
+    var selectedTab by rememberSaveable { mutableStateOf((if (openFocusForPackage != null) OrluneTab.FOCUS else OrluneTab.HOME).name) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
     var exportError by remember { mutableStateOf(false) }
@@ -75,6 +80,12 @@ fun OrluneRoot(app: OrluneApplication) {
         .collectAsState(initial = 0L)
     val comparisonApps by app.database.dailyUsageDao()
         .observeAppTotalsBetween(previousWeekStart, today)
+        .collectAsState(initial = emptyList())
+    // 4 consecutive 7-day buckets ending today, for Insights' "4 weeks" range — one
+    // query, InsightsMetrics.weeklyBreakdown does the bucketing itself (see its KDoc).
+    val fourWeeksStart = today - 27
+    val fourWeekDayRows by app.database.dailyUsageDao()
+        .observeAppDailyUsageBetween(fourWeeksStart, today)
         .collectAsState(initial = emptyList())
     val rules by app.database.ruleDao().observeAll().collectAsState(initial = emptyList())
     val apps by app.database.appDao().observeAll().collectAsState(initial = emptyList())
@@ -210,6 +221,7 @@ fun OrluneRoot(app: OrluneApplication) {
                     installedAppSource = app.installedAppLister,
                     ownPackageName = context.packageName,
                     todayUsageSecondsByPackage = todayUsageSecondsByPackage,
+                    initialSelectedPackage = openFocusForPackage,
                     sessions = focusSessions,
                     usageAccessGranted = usageAccessGranted,
                     overlayGranted = overlayGranted,
@@ -266,7 +278,10 @@ fun OrluneRoot(app: OrluneApplication) {
                     focusSessions = focusSessions,
                     longestSession = longestSession,
                     insightsPeriodStartMillis = insightsPeriodStartMillis,
-                    insightsPeriodEndExclusiveMillis = insightsPeriodEndMillisExclusive
+                    insightsPeriodEndExclusiveMillis = insightsPeriodEndMillisExclusive,
+                    fourWeekDayRows = fourWeekDayRows,
+                    today = today,
+                    zoneId = zoneId
                 )
                 OrluneTab.SETTINGS -> SettingsSection(
                     modifier = Modifier.padding(padding),
