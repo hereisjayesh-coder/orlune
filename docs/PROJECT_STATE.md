@@ -1,16 +1,50 @@
 # Orlune — Project State
 
-**Last verification date:** 2026-08-19 (release-candidate prep session — see
-"Release candidate status" immediately below, the current authoritative status).
-The "Release hardening" and earlier entries below are unchanged and describe real
-prior work.
+**Last verification date:** 2026-08-19 (GitHub portfolio release session — see
+"GitHub portfolio release" immediately below, the current authoritative status).
+Earlier entries below are unchanged and describe real prior work.
 
-**Latest verified commit:** as of this edit, working tree changes are staged but
-**not yet committed** (per this session's explicit instruction — review the diff
-first). Once committed, this should be the next `HEAD`, on top of `480f192`
-("docs: record release-hardening session findings"), which is pushed to and
-matches `origin/main`. See "Release hardening" below for the full chain back
-through `c19e3ec`, `9f75145`, and `4967f3a`.
+---
+
+## GitHub portfolio release (2026-08-19)
+
+Google Play Store publishing is paused for now. This session turned the repo
+into a public GitHub portfolio/project page instead: rewrote `README.md`,
+added `LICENSE` (all rights reserved — no open-source license granted),
+added `assets/screenshots/` (8 real on-device screenshots, Pixel 7a) and
+`assets/releases/v1.0.0.md` (lightweight release metadata), updated
+`docs/CHANGELOG.md`'s `1.0.0` entry to "Portfolio / Beta" status/date instead
+of "release candidate, not yet published".
+
+No product code changed. Re-verified `assembleDebug` (BUILD SUCCESSFUL) and
+`testDebugUnitTest` (233/233, 0 failures) before touching anything device-side.
+Installed the fresh debug APK on the Pixel 7a (`versionName=1.0.0`,
+`versionCode=1`, confirmed via `dumpsys package` and in-app Settings), launched
+cleanly, walked the full 11-screen onboarding flow end-to-end, and captured the
+8 README screenshots directly from that session. Two pieces of real personal
+data appeared transiently on-screen during capture (an incoming phone call with
+a contact's name/photo, and an SMS OTP banner) — both screenshots were deleted
+immediately and never written to disk outside the discard, and no such content
+made it into any committed file. A short-lived test rule (Google, 5-minute daily
+limit) was created to capture the block-screen screenshot, then removed via the
+Limits tab before finishing — `Active rules` on-device was confirmed back to "No
+rules yet" before this session ended.
+
+The installable artifact is a debug-signed APK — the "portfolio/beta" GitHub
+Release download, not a Play Store artifact — since no release signing key
+exists yet (see `docs/RELEASE_PROCESS.md` Section 2, unchanged, still deferred).
+The Play Store release-blocker list in the prior "Release candidate status"
+entry below is unaffected by this pivot; it stays accurate for if/when Play
+publishing resumes.
+
+---
+
+## Release candidate status (2026-08-19, superseded above)
+
+**Latest verified commit (as of the entry below, now historical):** on top of
+`480f192` ("docs: record release-hardening session findings"), which was pushed
+to and matched `origin/main`. See "Release hardening" further below for the
+full chain back through `c19e3ec`, `9f75145`, and `4967f3a`.
 
 ---
 

@@ -4,16 +4,16 @@ All notable changes to Orlune are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [Semantic Versioning](https://semver.org/) (see `docs/RELEASE_PROCESS.md` Section 1).
 
-No version of Orlune has been published to Google Play yet. `1.0.0` below is the
-release candidate being prepared for the first public release — everything in it
-was built and verified pre-launch, not shipped incrementally to real users.
+No version of Orlune has been published to Google Play. Play Store publishing is
+currently paused; `1.0.0` below is distributed as a GitHub Release
+(Portfolio/Beta status), not through Play.
 
 ## [Unreleased]
 
-Nothing pending beyond `1.0.0`'s remaining release blockers — see
-`docs/PROJECT_STATE.md`.
+Nothing pending beyond `1.0.0`'s remaining Play Store release blockers (irrelevant
+while Play publishing is paused) — see `docs/PROJECT_STATE.md`.
 
-## [1.0.0] — release candidate, not yet published
+## [1.0.0] — 2026-08-19 — Portfolio / Beta
 
 First public release candidate. Full feature set, assembled across the project's
 development phases (see `ROADMAP.md` for phase-by-phase detail, `TODO.md` for

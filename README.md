@@ -1,52 +1,138 @@
-# Orlune
+# ORLUNE
 
-A free, local-only, no-account, no-AI Android digital wellbeing app. Orlune helps people reduce distracting app usage, build focus habits, and understand their own screen time — entirely on-device, with zero network requests, zero analytics, and zero data leaving the phone.
+An Android digital wellbeing app designed to help you use your time intentionally.
 
-Orlune is an original product inspired by the general problem space of tools like Opal, Android Digital Wellbeing, ScreenZen, one sec, and Freedom. It shares no code, design, branding, or algorithms with any of them.
+## Overview
+
+Orlune is a local-first Android app for reducing distracting app usage, building
+focus habits, and understanding your own screen time. Everything happens on your
+device: usage is read from Android's own Usage Access API, every rule is evaluated
+by a deterministic engine, and every byte of data stays in a local database that
+never leaves the phone.
+
+- **Android-only** — no iOS, no web, no desktop
+- **Local-first** — all processing happens on-device
+- **Privacy-focused** — no account, no cloud, no ads, no AI, no behavioral analytics
+- **Deterministic** — every rule/engine produces the same output for the same
+  input, always; nothing is a statistical or machine-learned guess
+
+Orlune is not a medical device and makes no medical or clinical claims. It is a
+screen-time and focus tool, nothing more.
+
+## Key Features
+
+- App usage tracking
+- Daily app limits
+- Custom limits
+- Scheduled restrictions
+- Focus sessions
+- Quiet Mode (per-session notification policy)
+- App blocking / interruption
+- Weekly insights
+- Four-week insights
+- Local data export / delete
+- Privacy & Legal Center
+- Light / Dark / System theme modes
+- First-launch onboarding
+
+## Screenshots
+
+Captured on a physical Pixel 7a running the 1.0.0 build.
+
+| Home | Insights | Focus |
+|---|---|---|
+| ![Home](assets/screenshots/home.png) | ![Insights](assets/screenshots/insights.png) | ![Focus](assets/screenshots/focus.png) |
+
+| Block screen | App picker | Settings |
+|---|---|---|
+| ![Block screen](assets/screenshots/block.png) | ![App picker](assets/screenshots/apppicker.png) | ![Settings](assets/screenshots/settings.png) |
+
+| Privacy & Legal | Onboarding |
+|---|---|
+| ![Privacy & Legal](assets/screenshots/privacy.png) | ![Onboarding](assets/screenshots/onboarding.png) |
+
+## Download
+
+### Latest Release
+
+**Orlune v1.0.0**
+Status: Portfolio / Beta
+
+[Download the latest release on GitHub](../../releases/latest)
+
+## Releases
+
+| Version | Date | Status | Download |
+|---|---|---|---|
+| 1.0.0 | 2026-08-19 | Portfolio/Beta | [GitHub Release](../../releases/tag/v1.0.0) |
+
+## Privacy
+
+- Usage data is read, processed, and stored entirely on your device
+- No backend — Orlune does not request Android's `INTERNET` permission
+- No analytics, ads, or tracking SDKs of any kind
+- No account or sign-in of any kind
+- Data can be exported or deleted locally at any time from Settings
+
+Full privacy documentation is reachable offline in-app (Settings → Privacy &
+Legal Center) and tracked in this repository:
+
+- [`docs/legal-compliance-matrix.md`](docs/legal-compliance-matrix.md)
+- [`docs/google-play-privacy-compliance.md`](docs/google-play-privacy-compliance.md)
+
+These in-app documents are development drafts pending legal review — see those
+files for exactly what's still open.
+
+## Technology
+
+- Kotlin
+- Jetpack Compose
+- Room
+- `UsageStatsManager`
+- Coroutines / Flow
+- WorkManager
+
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full as-built package layout and
+toolchain versions.
 
 ## Project Status
 
-Phases 0–5 are complete and verified (research, project setup, Room database, usage
-monitoring, deterministic rule engine, app blocking), and Phase 6 (focus sessions) is
-implemented with a preserving Room migration — see `docs/PROJECT_STATE.md` for the current, dated snapshot
-(build/test status, known bugs, next task) and `ROADMAP.md` for phase-by-phase detail.
-`TODO.md` has full task-level history. The current Compose shell provides Home, Focus,
-Limits, Insights, and Settings flows, with a native app picker (real icons/names,
-search, no raw package names shown to users) for choosing which apps a rule or focus
-session applies to, and a Privacy & Legal Center with 15 documents, reachable offline
-from Settings. Remaining onboarding and release hardening are tracked in
-`docs/PROJECT_STATE.md` and `ROADMAP.md`.
+Current status: **1.0.0 portfolio/beta build.**
 
-Agents picking up this repo: start with `AGENTS.MD`, then `docs/PROJECT_STATE.md`.
+This is not a Google Play production release. Play Store publishing is currently
+paused; this repository and its GitHub Releases are the primary distribution
+channel for now. See [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) for the
+full, dated build/test status.
 
-## Getting Started
+## Roadmap
 
-1. Android Studio is installed at `F:\Android Stu`, SDK at `F:\Android\Sdk`. Open this folder in it.
-2. Gradle caches live at `F:\GradleUserHome` (via the `GRADLE_USER_HOME` user environment variable) rather than the default `C:\Users\<you>\.gradle`, to keep the nearly-full system drive clear.
-3. Build from the command line with:
-   ```
-   .\gradlew.bat assembleDebug
-   ```
-4. No emulator is configured (8 GB RAM machine) — use a physical device with USB debugging enabled. `adb devices` should list it once connected; run on it from Android Studio or `.\gradlew.bat installDebug`.
+**Completed**
+- Local usage monitoring, deterministic rule engine, app blocking
+- Focus sessions with per-session Quiet Mode
+- Weekly and four-week Insights
+- First-launch onboarding (11 screens)
+- Privacy & Legal Center (15 documents, in-app, offline)
+- Local export / delete-all-data controls
+- Light / Dark / System theming
 
-## Core Principles
+**In progress**
+- Security and performance hardening pass
+- Broader automated test coverage
 
-- Free, no account, no login, no cloud, no AI, no analytics or ad SDKs.
-- All data stored and processed on the device. Nothing is ever uploaded.
-- Every algorithm is deterministic and documented — same input, same output, always.
-- Every sensitive permission is explained in plain language before it's requested.
+**Future**
+- Legal review of Privacy Policy / Terms of Service
+- Recurring focus-session scheduling
+- Google Play submission (paused for now)
 
-## Documentation
+Feature scope is deliberately conservative — see
+[`AGENTS.MD`](AGENTS.MD)'s "Forbidden" section for constraints this project holds
+permanently (no accounts, no AI, no ads, no analytics, no network access).
 
-- `AGENTS.MD` — standing rules for any coding agent working on this repo: product identity, forbidden technologies, architecture, privacy requirements, build/test commands, conventions
-- `docs/PROJECT_STATE.md` — dated snapshot: current phase, build/test status, known bugs, next recommended task
-- `docs/phase-0-research.md` — product architecture, competitor research, MVP scope, phased plan
-- `docs/android-platform-capabilities.md` — what the Android SDK can and can't do for usage monitoring and blocking
-- `docs/accessibility-service-compliance.md` — AccessibilityService use, disclosure, and Play compliance
-- `docs/dependency-audit.md` — every dependency in the project, with purpose/license/network/telemetry/privacy notes
-- `docs/app-visibility-compliance.md` — why and how the app picker enumerates installed apps, and why it doesn't use `QUERY_ALL_PACKAGES`
-- `docs/legal-compliance-matrix.md` — jurisdiction-by-jurisdiction (India DPDP, GDPR/UK GDPR, CCPA/CPRA, COPPA) applicability tracking for the in-app legal documents
-- `docs/google-play-privacy-compliance.md` — Google Play Data Safety / User Data / permissions policy mapping
-- `ARCHITECTURE.md` — as-built package structure and verified build toolchain
-- `ROADMAP.md` — phase-by-phase status
-- `TODO.md` — task-level history
+## License
+
+See [`LICENSE`](LICENSE). This repository is public for portfolio purposes; no
+open-source license is currently granted.
+
+## Developer
+
+Built independently as the Orlune project.
